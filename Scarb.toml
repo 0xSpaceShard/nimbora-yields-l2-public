@@ -7,13 +7,11 @@ edition = "2023_10"
 
 [dependencies]
 openzeppelin = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v0.8.0" }
-snforge_std =  { git = "https://github.com/foundry-rs/starknet-foundry.git", tag = "v0.13.0" }
+snforge_std =  { git = "https://github.com/foundry-rs/starknet-foundry.git", tag = "v0.12.0" }
 
 [[target.starknet-contract]]
 sierra = true
 casm = true
-allowed-libfuncs-list.name = "experimental"
-
 
 [scripts]
 test = "snforge test"

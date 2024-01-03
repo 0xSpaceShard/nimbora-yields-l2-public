@@ -1,8 +1,1 @@
 target
-keystore
-.env
-account
-keystore
-node_modules
-l1-configs.json
-.snfoundry_cache
