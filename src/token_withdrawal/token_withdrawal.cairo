@@ -1,11 +1,11 @@
 #[starknet::contract]
-mod TokenWithdraw {
+mod TokenWithdrawal {
     use openzeppelin::token::erc721::ERC721Component;
     use openzeppelin::introspection::src5::SRC5Component;
 
     use starknet::{ContractAddress, get_caller_address};
 
-    use nimbora_yields::token_withdraw::interface::{ITokenWithdraw}; 
+    use nimbora_yields::token_withdrawal::interface::{ITokenWithdrawal};
 
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
     component!(path: ERC721Component, storage: erc721, event: ERC721Event);
@@ -22,8 +22,7 @@ mod TokenWithdraw {
         erc721: ERC721Component::Storage,
         #[substorage(v0)]
         src5: SRC5Component::Storage,
-        token_manager: ContractAddress,
-        supply: u256
+        token_manager: ContractAddress
     }
 
     #[event]
@@ -41,10 +40,7 @@ mod TokenWithdraw {
 
     #[constructor]
     fn constructor(
-        ref self: ContractState,
-        token_manager: ContractAddress,
-        name: felt252,
-        symbol: felt252
+        ref self: ContractState, token_manager: ContractAddress, name: felt252, symbol: felt252
     ) {
         self.erc721.initializer(name, symbol);
         self.token_manager.write(token_manager);
@@ -52,30 +48,23 @@ mod TokenWithdraw {
 
 
     #[abi(embed_v0)]
-    impl TokenWithdraw of ITokenWithdraw<ContractState> {
-
-        fn mint(ref self: ContractState, to: ContractAddress) {
+    impl TokenWithdrawal of ITokenWithdrawal<ContractState> {
+        fn mint(ref self: ContractState, to: ContractAddress, id: u256) {
             self._assert_only_token_manager();
-            let new_id = self.supply.read();
-            self.erc721._mint(to, new_id);
-            self.supply.write(new_id + 1);
+            self.erc721._mint(to, id);
         }
 
-        fn burn(ref self: ContractState, id: u256){
+        fn burn(ref self: ContractState, id: u256) {
             self._assert_only_token_manager();
             self.erc721._burn(id);
         }
-
     }
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
-        fn _assert_only_token_manager(
-            ref self: ContractState)  {
+        fn _assert_only_token_manager(ref self: ContractState) {
             let caller = get_caller_address();
             assert(self.token_manager.read() == caller, Errors::INVALID_CALLER);
         }
     }
-
-
 }

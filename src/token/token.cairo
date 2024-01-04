@@ -53,17 +53,15 @@ mod Token {
             self.erc20._mint(recipient, amount);
         }
 
-        fn burn(ref self: ContractState, acccount: ContractAddress, amount: u256){
+        fn burn(ref self: ContractState, acccount: ContractAddress, amount: u256) {
             self._assert_only_token_manager();
             self.erc20._burn(acccount, amount);
         }
-
     }
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
-        fn _assert_only_token_manager(
-            ref self: ContractState)  {
+        fn _assert_only_token_manager(ref self: ContractState) {
             let caller = get_caller_address();
             assert(self.token_manager.read() == caller, Errors::INVALID_CALLER);
         }
@@ -84,5 +82,4 @@ mod Token {
             self.erc20.symbol()
         }
     }
-
 }
