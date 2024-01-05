@@ -446,7 +446,10 @@ mod Token {
                     self.buffer.write(remaining_buffer_mem);
                     self.underlying_transit.write(0);
                     StrategyReportL2 {
-                        l1_strategy: l1_strategy, action_id: 1, amount: 0, previous_epoch_share_price: previous_epoch_share_price
+                        l1_strategy: l1_strategy,
+                        action_id: 1,
+                        amount: 0,
+                        previous_epoch_share_price: previous_epoch_share_price
                     }
                 } else {
                     self.buffer.write(0);
