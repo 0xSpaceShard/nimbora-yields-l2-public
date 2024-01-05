@@ -11,7 +11,7 @@ mod Token {
         IAccessControlDispatcher, IAccessControlDispatcherTrait
     };
 
-    use nimbora_yields::token_manager::interface::{ITokenManager, WithdrawalInfo, StrategyReport};
+    use nimbora_yields::token_manager::interface::{ITokenManager, WithdrawalInfo, StrategyReportL2};
     use nimbora_yields::token::interface::{ITokenDispatcher, ITokenDispatcherTrait};
     use nimbora_yields::token_withdrawal::interface::{
         ITokenWithdrawalDispatcher, ITokenWithdrawalDispatcherTrait
@@ -19,6 +19,7 @@ mod Token {
     use nimbora_yields::pooling_manager::interface::{
         IPoolingManagerDispatcher, IPoolingManagerDispatcherTrait
     };
+
     use nimbora_yields::utils::{CONSTANTS};
 
 
@@ -166,6 +167,10 @@ mod Token {
 
         fn dust_limit(self: @ContractState) -> u256 {
             self.dust_limit.read()
+        }
+
+        fn total_assets(self: @ContractState) -> u256 {
+            self._total_assets()
         }
 
 
@@ -346,7 +351,7 @@ mod Token {
 
         fn handle_report(
             ref self: ContractState, l1_net_asset_value: u256, underlying_bridged_amount: u256
-        ) -> StrategyReport {
+        ) -> StrategyReportL2 {
             self._assert_only_pool_manager();
 
             let epoch = self.epoch.read();
@@ -427,11 +432,11 @@ mod Token {
                 self.underlying_transit.write(0);
                 self.buffer.write(remaining_buffer_mem);
 
-                StrategyReport {
+                StrategyReportL2 {
                     l1_strategy: l1_strategy,
-                    epoch: new_epoch,
                     action_id: 2,
-                    amount: underlying_request_amount
+                    amount: underlying_request_amount,
+                    previous_epoch_share_price: previous_epoch_share_price
                 }
             } else {
                 self.finalized_withdrawal_len.write(i);
@@ -440,17 +445,17 @@ mod Token {
                 if (dust_limit > remaining_buffer_mem) {
                     self.buffer.write(remaining_buffer_mem);
                     self.underlying_transit.write(0);
-                    StrategyReport {
-                        l1_strategy: l1_strategy, epoch: new_epoch, action_id: 1, amount: 0
+                    StrategyReportL2 {
+                        l1_strategy: l1_strategy, action_id: 1, amount: 0, previous_epoch_share_price: previous_epoch_share_price
                     }
                 } else {
                     self.buffer.write(0);
                     self.underlying_transit.write(remaining_buffer_mem);
-                    StrategyReport {
+                    StrategyReportL2 {
                         l1_strategy: l1_strategy,
-                        epoch: new_epoch,
                         action_id: 0,
-                        amount: remaining_buffer_mem
+                        amount: remaining_buffer_mem,
+                        previous_epoch_share_price: previous_epoch_share_price
                     }
                 }
             }

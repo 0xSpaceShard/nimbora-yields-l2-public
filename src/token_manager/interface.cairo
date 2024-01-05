@@ -9,11 +9,11 @@ struct WithdrawalInfo {
 }
 
 #[derive(Copy, Drop, Serde)]
-struct StrategyReport {
+struct StrategyReportL2 {
     l1_strategy: EthAddress,
-    epoch: u256,
     action_id: u256,
-    amount: u256
+    amount: u256,
+    previous_epoch_share_price: u256
 }
 
 
@@ -39,6 +39,7 @@ trait ITokenManager<TContractState> {
     fn withdrawal_len(self: @TContractState) -> u256;
     fn withdrawal_info(self: @TContractState, id: u256) -> WithdrawalInfo;
     fn dust_limit(self: @TContractState) -> u256;
+    fn total_assets(self: @TContractState) -> u256;
 
 
     fn initialiser(
@@ -69,5 +70,5 @@ trait ITokenManager<TContractState> {
 
     fn handle_report(
         ref self: TContractState, l1_net_asset_value: u256, underlying_bridged_amount: u256
-    ) -> StrategyReport;
+    ) -> StrategyReportL2;
 }
