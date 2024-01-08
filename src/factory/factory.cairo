@@ -26,8 +26,7 @@ mod StrategyFactory {
     struct Storage {
         pooling_manager: ContractAddress,
         token_class_hash: ClassHash,
-        token_manager_class_hash: ClassHash,
-        token_withdrawal_class_hash: ClassHash
+        token_manager_class_hash: ClassHash
     }
 
 
@@ -35,8 +34,7 @@ mod StrategyFactory {
     #[derive(Drop, starknet::Event)]
     enum Event {
         TokenHashUpdated: TokenHashUpdated,
-        TokenManagerHashUpdated: TokenManagerHashUpdated,
-        TokenWithdrawHashUpdated: TokenWithdrawHashUpdated
+        TokenManagerHashUpdated: TokenManagerHashUpdated
     }
 
     #[derive(Drop, starknet::Event)]
@@ -47,12 +45,6 @@ mod StrategyFactory {
 
     #[derive(Drop, starknet::Event)]
     struct TokenManagerHashUpdated {
-        previous_hash: ClassHash,
-        new_hash: ClassHash
-    }
-
-    #[derive(Drop, starknet::Event)]
-    struct TokenWithdrawHashUpdated {
         previous_hash: ClassHash,
         new_hash: ClassHash
     }
@@ -70,14 +62,12 @@ mod StrategyFactory {
         ref self: ContractState,
         pooling_manager: ContractAddress,
         token_class_hash: ClassHash,
-        token_manager_class_hash: ClassHash,
-        token_withdrawal_class_hash: ClassHash
+        token_manager_class_hash: ClassHash
     ) {
         assert(pooling_manager.is_non_zero(), Errors::ZERO_ADDRESS);
         self.pooling_manager.write(pooling_manager);
         self._set_token_class_hash(token_class_hash);
         self._set_token_manager_class_hash(token_manager_class_hash);
-        self._set_token_withdrawal_class_hash(token_withdrawal_class_hash);
     }
 
 
@@ -91,9 +81,6 @@ mod StrategyFactory {
             self.token_class_hash.read()
         }
 
-        fn token_withdrawal_class_hash(self: @ContractState) -> ClassHash {
-            self.token_withdrawal_class_hash.read()
-        }
 
         fn deploy_strategy(
             ref self: ContractState,
@@ -101,8 +88,6 @@ mod StrategyFactory {
             underlying: ContractAddress,
             token_name: felt252,
             token_symbol: felt252,
-            token_withdrawal_name: felt252,
-            token_withdrawal_symbol: felt252,
             performance_fees: u256,
             min_deposit: u256,
             max_deposit: u256,
@@ -110,16 +95,14 @@ mod StrategyFactory {
             max_withdrawal: u256,
             withdrawal_epoch_delay: u256,
             dust_limit: u256
-        ) -> (ContractAddress, ContractAddress, ContractAddress) {
+        ) -> (ContractAddress, ContractAddress) {
             self._assert_only_owner();
-            let (token_manager_salt, token_salt, token_withdrawal_salt) = self
+            let (token_manager_salt, token_salt) = self
                 ._compute_salt_for_strategy(
                     l1_strategy,
                     underlying,
                     token_name,
-                    token_symbol,
-                    token_withdrawal_name,
-                    token_withdrawal_symbol
+                    token_symbol
                 );
             let pooling_manager = self.pooling_manager.read();
             let mut constructor_token_manager_calldata = array![
@@ -154,24 +137,10 @@ mod StrategyFactory {
                 token_manager_deployed_address.into(), token_name.into(), token_symbol.into()
             ];
 
-            let mut constructor_token_withdraw_calldata = array![
-                token_manager_deployed_address.into(),
-                token_withdrawal_name.into(),
-                token_withdrawal_symbol.into()
-            ];
-
             let (token_deployed_address, _) = deploy_syscall(
                 self.token_class_hash.read(), token_salt, constructor_token_calldata.span(), false
             )
                 .expect('failed to deploy t');
-
-            let (token_withdrawal_deployed_address, _) = deploy_syscall(
-                self.token_withdrawal_class_hash.read(),
-                token_withdrawal_salt,
-                constructor_token_withdraw_calldata.span(),
-                false
-            )
-                .expect('failed to deploy tw');
 
             let pooling_manager = self.pooling_manager.read();
             let manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
@@ -179,7 +148,6 @@ mod StrategyFactory {
                 .register_strategy(
                     token_manager_deployed_address,
                     token_deployed_address,
-                    token_withdrawal_deployed_address,
                     l1_strategy,
                     underlying,
                     performance_fees,
@@ -190,8 +158,7 @@ mod StrategyFactory {
                 );
             (
                 token_manager_deployed_address,
-                token_deployed_address,
-                token_withdrawal_deployed_address
+                token_deployed_address
             )
         }
 
@@ -219,18 +186,6 @@ mod StrategyFactory {
             pooling_manager_disp.emit_token_class_hash_updated_event(new_token_class_hash);
         }
 
-        fn set_token_withdrawal_class_hash(
-            ref self: ContractState, new_token_withdrawal_class_hash: ClassHash,
-        ) {
-            self._assert_only_owner();
-            self._set_token_withdrawal_class_hash(new_token_withdrawal_class_hash);
-            let pooling_manager = self.pooling_manager.read();
-            let pooling_manager_disp = IPoolingManagerDispatcher {
-                contract_address: pooling_manager
-            };
-            pooling_manager_disp
-                .emit_token_withdrawal_class_hash_updated_event(new_token_withdrawal_class_hash);
-        }
     }
 
 
@@ -249,10 +204,8 @@ mod StrategyFactory {
             l1_strategy: EthAddress,
             underlying: ContractAddress,
             token_name: felt252,
-            token_symbol: felt252,
-            token_withdrawal_name: felt252,
-            token_withdrawal_symbol: felt252,
-        ) -> (felt252, felt252, felt252) {
+            token_symbol: felt252
+        ) -> (felt252, felt252) {
             let mut token_manager_data = array![];
             token_manager_data.append('TOKEN_MANAGER');
             token_manager_data.append(l1_strategy.into());
@@ -265,13 +218,7 @@ mod StrategyFactory {
             token_data.append(token_symbol.into());
             let token_salt = poseidon_hash_span(token_data.span());
 
-            let mut token_withdrawal_data = array![];
-            token_withdrawal_data.append('TOKEN');
-            token_withdrawal_data.append(token_name.into());
-            token_withdrawal_data.append(token_symbol.into());
-            let token_withdrawal_salt = poseidon_hash_span(token_withdrawal_data.span());
-
-            (token_manager_salt, token_salt, token_withdrawal_salt)
+            (token_manager_salt, token_salt)
         }
 
         fn _set_token_manager_class_hash(ref self: ContractState, token_manager_hash: ClassHash) {
@@ -284,11 +231,5 @@ mod StrategyFactory {
             self.token_class_hash.write(token_hash);
         }
 
-        fn _set_token_withdrawal_class_hash(
-            ref self: ContractState, token_withdrawal_hash: ClassHash
-        ) {
-            assert(token_withdrawal_hash.is_non_zero(), Errors::ZERO_HASH);
-            self.token_withdrawal_class_hash.write(token_withdrawal_hash);
-        }
     }
 }
