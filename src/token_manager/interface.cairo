@@ -34,7 +34,7 @@ trait ITokenManager<TContractState> {
     fn l1_net_asset_value(self: @TContractState) -> u256;
     fn underlying_transit(self: @TContractState) -> u256;
     fn buffer(self: @TContractState) -> u256;
-    fn withdrawal_info(self: @TContractState, user: ContractAddress,id: u256) -> WithdrawalInfo;
+    fn withdrawal_info(self: @TContractState, user: ContractAddress, id: u256) -> WithdrawalInfo;
     fn user_withdrawal_len(self: @TContractState, user: ContractAddress) -> u256;
     fn dust_limit(self: @TContractState) -> u256;
     fn total_assets(self: @TContractState) -> u256;
@@ -42,10 +42,7 @@ trait ITokenManager<TContractState> {
     fn withdrawal_exchange_rate(self: @TContractState, epoch: u256) -> u256;
 
 
-
-    fn initialiser(
-        ref self: TContractState, token: ContractAddress
-    );
+    fn initialiser(ref self: TContractState, token: ContractAddress);
 
     fn set_performance_fees(ref self: TContractState, new_performance_fees: u256);
 

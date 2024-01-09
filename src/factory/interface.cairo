@@ -25,5 +25,4 @@ trait IFactory<TContractState> {
     );
 
     fn set_token_class_hash(ref self: TContractState, new_token_class_hash: ClassHash);
-
 }

@@ -1,3 +1,5 @@
+/// @title Factory Module
+/// @notice Responsible for deploying strategies and their associated tokens.
 #[starknet::contract]
 mod Factory {
     // Core lib imports.
@@ -56,7 +58,10 @@ mod Factory {
         const INVALID_CALLER: felt252 = 'Invalid caller';
     }
 
-
+    /// @notice Constructor for the Factory contract.
+    /// @param pooling_manager The address of the pooling manager.
+    /// @param token_class_hash The class hash of the token.
+    /// @param token_manager_class_hash The class hash of the token manager.
     #[constructor]
     fn constructor(
         ref self: ContractState,
@@ -73,15 +78,32 @@ mod Factory {
 
     #[abi(embed_v0)]
     impl Factory of IFactory<ContractState> {
+        /// @notice Reads the class hash of the token manager
+        /// @return The class hash of the token manager
         fn token_manager_class_hash(self: @ContractState) -> ClassHash {
             self.token_manager_class_hash.read()
         }
 
+        /// @notice Reads the class hash of the token
+        /// @return The class hash of the token
         fn token_class_hash(self: @ContractState) -> ClassHash {
             self.token_class_hash.read()
         }
 
-
+        /// @notice Deploys a new strategy with specified parameters
+        /// @dev Only callable by the owner of the contract
+        /// @param l1_strategy The Ethereum address of the L1 strategy
+        /// @param underlying The contract address of the underlying asset
+        /// @param token_name The name for the new token
+        /// @param token_symbol The symbol for the new token
+        /// @param performance_fees The performance fees for the strategy
+        /// @param min_deposit The minimum deposit limit
+        /// @param max_deposit The maximum deposit limit
+        /// @param min_withdrawal The minimum withdrawal limit
+        /// @param max_withdrawal The maximum withdrawal limit
+        /// @param withdrawal_epoch_delay The delay in epochs for withdrawals
+        /// @param dust_limit The dust limit for the strategy
+        /// @return The addresses of the deployed token manager and token
         fn deploy_strategy(
             ref self: ContractState,
             l1_strategy: EthAddress,
@@ -98,12 +120,7 @@ mod Factory {
         ) -> (ContractAddress, ContractAddress) {
             self._assert_only_owner();
             let (token_manager_salt, token_salt) = self
-                ._compute_salt_for_strategy(
-                    l1_strategy,
-                    underlying,
-                    token_name,
-                    token_symbol
-                );
+                ._compute_salt_for_strategy(l1_strategy, underlying, token_name, token_symbol);
             let pooling_manager = self.pooling_manager.read();
             let mut constructor_token_manager_calldata = array![
                 pooling_manager.into(),
@@ -156,13 +173,12 @@ mod Factory {
                     min_withdrawal,
                     max_withdrawal
                 );
-            (
-                token_manager_deployed_address,
-                token_deployed_address
-            )
+            (token_manager_deployed_address, token_deployed_address)
         }
 
-
+        /// @notice Sets a new class hash for the token manager
+        /// @dev Only callable by the owner of the contract
+        /// @param new_token_manager_class_hash The new class hash to be set for the token manager
         fn set_token_manager_class_hash(
             ref self: ContractState, new_token_manager_class_hash: ClassHash,
         ) {
@@ -176,6 +192,9 @@ mod Factory {
                 .emit_token_manager_class_hash_updated_event(new_token_manager_class_hash);
         }
 
+        /// @notice Sets a new class hash for the token
+        /// @dev Only callable by the owner of the contract
+        /// @param new_token_class_hash The new class hash to be set for the token
         fn set_token_class_hash(ref self: ContractState, new_token_class_hash: ClassHash,) {
             self._assert_only_owner();
             self._set_token_class_hash(new_token_class_hash);
@@ -185,12 +204,13 @@ mod Factory {
             };
             pooling_manager_disp.emit_token_class_hash_updated_event(new_token_class_hash);
         }
-
     }
 
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
+        /// @notice Asserts that the caller has the owner role
+        /// @dev Verifies the caller's role using the Access Control Dispatcher
         fn _assert_only_owner(self: @ContractState) {
             let caller = get_caller_address();
             let pooling_manager = self.pooling_manager.read();
@@ -199,6 +219,13 @@ mod Factory {
             assert(has_role, Errors::INVALID_CALLER);
         }
 
+
+        /// @notice Computes the salts for token manager and token based on strategy parameters
+        /// @param l1_strategy The Ethereum address of the L1 strategy
+        /// @param underlying The contract address of the underlying asset
+        /// @param token_name The name of the token
+        /// @param token_symbol The symbol of the token
+        /// @return A tuple containing the salts for the token manager and token
         fn _compute_salt_for_strategy(
             self: @ContractState,
             l1_strategy: EthAddress,
@@ -221,15 +248,21 @@ mod Factory {
             (token_manager_salt, token_salt)
         }
 
+
+        /// @notice Sets the class hash for the token manager
+        /// @dev Ensures that the provided class hash is non-zero before updating
+        /// @param token_manager_hash The new class hash to be set for the token manager
         fn _set_token_manager_class_hash(ref self: ContractState, token_manager_hash: ClassHash) {
             assert(token_manager_hash.is_non_zero(), Errors::ZERO_HASH);
             self.token_manager_class_hash.write(token_manager_hash);
         }
 
+        /// @notice Sets the class hash for the token
+        /// @dev Ensures that the provided class hash is non-zero before updating
+        /// @param token_hash The new class hash to be set for the token
         fn _set_token_class_hash(ref self: ContractState, token_hash: ClassHash) {
             assert(token_hash.is_non_zero(), Errors::ZERO_HASH);
             self.token_class_hash.write(token_hash);
         }
-
     }
 }

@@ -32,6 +32,12 @@ mod Token {
         const INVALID_CALLER: felt252 = 'Caller is not manager';
     }
 
+
+    /// @notice Constructor for the Token contract
+    /// @param token_manager The address of the token manager contract
+    /// @param name The name of the token
+    /// @param symbol The symbol of the token
+    /// @param decimals The number of decimals for the token
     #[constructor]
     fn constructor(
         ref self: ContractState,
@@ -48,11 +54,20 @@ mod Token {
 
     #[abi(embed_v0)]
     impl Token of IToken<ContractState> {
+        /// @notice Mints tokens to a specified recipient
+        /// @dev Only callable by the token manager
+        /// @param recipient The address of the recipient to receive minted tokens
+        /// @param amount The amount of tokens to mint
         fn mint(ref self: ContractState, recipient: ContractAddress, amount: u256) {
             self._assert_only_token_manager();
             self.erc20._mint(recipient, amount);
         }
 
+
+        /// @notice Burns tokens from a specified account
+        /// @dev Only callable by the token manager
+        /// @param account The address of the account from which tokens will be burned
+        /// @param amount The amount of tokens to burn
         fn burn(ref self: ContractState, acccount: ContractAddress, amount: u256) {
             self._assert_only_token_manager();
             self.erc20._burn(acccount, amount);
