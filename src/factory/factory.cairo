@@ -1,5 +1,5 @@
 #[starknet::contract]
-mod StrategyFactory {
+mod Factory {
     // Core lib imports.
     use core::result::ResultTrait;
     use starknet::{

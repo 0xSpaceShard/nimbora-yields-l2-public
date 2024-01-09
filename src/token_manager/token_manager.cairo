@@ -368,12 +368,11 @@ mod Token {
 
             let handled_epoch_withdrawal_len = self.handled_epoch_withdrawal_len.read();
             let buffer_mem = self.buffer.read() + underlying_bridged_amount;
-
-
-            // Share price decrease, split the loss between shareholders and withdrawers.
+            
+            let mut profit = 0;
 
             if(received_from_l1 < sent_to_l1){
-                let underlying_loss = received_from_l1 - sent_to_l1;
+                let underlying_loss = sent_to_l1 - received_from_l1;
                 let total_underlying = buffer_mem + l1_net_asset_value;
                 let total_underlying_due = self._total_underlying_due(handled_epoch_withdrawal_len, epoch);
                 let amount_to_consider = total_underlying + total_underlying_due;
@@ -387,7 +386,10 @@ mod Token {
                     self.withdrawal_pool.write(i, withdrawal_pool - withdrawal_epoch_loss_incured);
                     i += 1;
                 }
-            } 
+            }  else {
+                // Share price increase, performance_fee is taken
+                profit = received_from_l1 - sent_to_l1;
+            }
 
 
             let mut remaining_buffer_mem = buffer_mem;
@@ -438,6 +440,17 @@ mod Token {
 
                 let new_share_price = self._convert_to_assets(one_share_unite);
 
+                if(profit > 0){
+                    let performance_fees = self.performance_fees.read();
+                    let performance_fees_from_profit = (profit * performance_fees) / CONSTANTS::WAD;
+                    let shares_to_mint = self._convert_to_shares(performance_fees_from_profit);
+                    let pooling_manager = self.pooling_manager.read();
+                    let pooling_manager_disp = IPoolingManagerDispatcher{ contract_address: pooling_manager };
+                    let fees_recipient = pooling_manager_disp.fees_recipient();
+                    let token_disp = ITokenDispatcher { contract_address: token };
+                    token_disp.mint(fees_recipient, shares_to_mint);
+                }
+
                 StrategyReportL2 {
                     l1_strategy: l1_strategy,
                     action_id: 2,
@@ -456,6 +469,17 @@ mod Token {
 
                     let new_share_price = self._convert_to_assets(one_share_unite);
 
+                    if(profit > 0){
+                        let performance_fees = self.performance_fees.read();
+                        let performance_fees_from_profit = (profit * performance_fees) / CONSTANTS::WAD;
+                        let shares_to_mint = self._convert_to_shares(performance_fees_from_profit);
+                        let pooling_manager = self.pooling_manager.read();
+                        let pooling_manager_disp = IPoolingManagerDispatcher{ contract_address: pooling_manager };
+                        let fees_recipient = pooling_manager_disp.fees_recipient();
+                        let token_disp = ITokenDispatcher { contract_address: token };
+                        token_disp.mint(fees_recipient, shares_to_mint);
+                    }
+
                     StrategyReportL2 {
                         l1_strategy: l1_strategy, action_id: 1, amount: 0, new_share_price: new_share_price
                     }
@@ -465,6 +489,17 @@ mod Token {
                     self.underlying_transit.write(remaining_buffer_mem);
 
                     let new_share_price = self._convert_to_assets(one_share_unite);
+
+                    if(profit > 0){
+                        let performance_fees = self.performance_fees.read();
+                        let performance_fees_from_profit = (profit * performance_fees) / CONSTANTS::WAD;
+                        let shares_to_mint = self._convert_to_shares(performance_fees_from_profit);
+                        let pooling_manager = self.pooling_manager.read();
+                        let pooling_manager_disp = IPoolingManagerDispatcher{ contract_address: pooling_manager };
+                        let fees_recipient = pooling_manager_disp.fees_recipient();
+                        let token_disp = ITokenDispatcher { contract_address: token };
+                        token_disp.mint(fees_recipient, shares_to_mint);
+                    }
 
                     StrategyReportL2 {
                         l1_strategy: l1_strategy,
