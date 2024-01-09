@@ -526,7 +526,7 @@ mod TokenManager {
             let token_disp = ERC20ABIDispatcher { contract_address: token };
             let decimals = token_disp.decimals();
             let l1_strategy = self.l1_strategy.read();
-            let one_share_unite = MATH::pow(10, decimals.into());
+            let one_share_unit = MATH::pow(10, decimals.into());
 
             if (cumulatif_due_underlying > 0) {
                 // We need more underlying from L1
@@ -534,7 +534,7 @@ mod TokenManager {
                 self.buffer.write(remaining_buffer_mem);
                 self.underlying_transit.write(0);
 
-                let new_share_price = self._convert_to_assets(one_share_unite);
+                
 
                 if (profit > 0) {
                     let performance_fees = self.performance_fees.read();
@@ -548,6 +548,8 @@ mod TokenManager {
                     let token_disp = ITokenDispatcher { contract_address: token };
                     token_disp.mint(fees_recipient, shares_to_mint);
                 }
+
+                let new_share_price = self._convert_to_assets(one_share_unit);
 
                 StrategyReportL2 {
                     l1_strategy: l1_strategy,
@@ -564,8 +566,6 @@ mod TokenManager {
                     self.buffer.write(remaining_buffer_mem);
                     self.underlying_transit.write(0);
 
-                    let new_share_price = self._convert_to_assets(one_share_unite);
-
                     if (profit > 0) {
                         let performance_fees = self.performance_fees.read();
                         let performance_fees_from_profit = (profit * performance_fees)
@@ -579,6 +579,8 @@ mod TokenManager {
                         let token_disp = ITokenDispatcher { contract_address: token };
                         token_disp.mint(fees_recipient, shares_to_mint);
                     }
+
+                    let new_share_price = self._convert_to_assets(one_share_unit);
 
                     StrategyReportL2 {
                         l1_strategy: l1_strategy,
@@ -591,8 +593,6 @@ mod TokenManager {
                     self.buffer.write(0);
                     self.underlying_transit.write(remaining_buffer_mem);
 
-                    let new_share_price = self._convert_to_assets(one_share_unite);
-
                     if (profit > 0) {
                         let performance_fees = self.performance_fees.read();
                         let performance_fees_from_profit = (profit * performance_fees)
@@ -606,6 +606,8 @@ mod TokenManager {
                         let token_disp = ITokenDispatcher { contract_address: token };
                         token_disp.mint(fees_recipient, shares_to_mint);
                     }
+
+                    let new_share_price = self._convert_to_assets(one_share_unit);
 
                     StrategyReportL2 {
                         l1_strategy: l1_strategy,

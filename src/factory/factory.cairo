@@ -16,6 +16,7 @@ mod Factory {
     use openzeppelin::access::accesscontrol::interface::{
         IAccessControlDispatcher, IAccessControlDispatcherTrait
     };
+    use openzeppelin::token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
 
 
     // Local imports.
@@ -150,8 +151,12 @@ mod Factory {
             )
                 .expect('failed to deploy tm');
 
+
+            let token_disp = ERC20ABIDispatcher{ contract_address: underlying };
+            let decimals = token_disp.decimals();
+
             let mut constructor_token_calldata = array![
-                token_manager_deployed_address.into(), token_name.into(), token_symbol.into()
+                token_manager_deployed_address.into(), token_name.into(), token_symbol.into(), decimals.into()
             ];
 
             let (token_deployed_address, _) = deploy_syscall(
@@ -176,6 +181,7 @@ mod Factory {
             (token_manager_deployed_address, token_deployed_address)
         }
 
+        
         /// @notice Sets a new class hash for the token manager
         /// @dev Only callable by the owner of the contract
         /// @param new_token_manager_class_hash The new class hash to be set for the token manager
