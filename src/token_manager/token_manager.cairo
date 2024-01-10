@@ -722,8 +722,7 @@ mod TokenManager {
         fn _check_profit_and_mint(ref self: ContractState, profit: u256, token: ContractAddress) {
             if (profit > 0) {
                 let performance_fees = self.performance_fees.read();
-                let performance_fees_from_profit = (profit * performance_fees)
-                    / CONSTANTS::WAD;
+                let performance_fees_from_profit = (profit * performance_fees) / CONSTANTS::WAD;
                 let shares_to_mint = self._convert_to_shares(performance_fees_from_profit);
                 let pooling_manager = self.pooling_manager.read();
                 let pooling_manager_disp = IPoolingManagerDispatcher {
