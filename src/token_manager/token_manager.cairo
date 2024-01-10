@@ -534,20 +534,7 @@ mod TokenManager {
                 self.buffer.write(remaining_buffer_mem);
                 self.underlying_transit.write(0);
 
-                
-
-                if (profit > 0) {
-                    let performance_fees = self.performance_fees.read();
-                    let performance_fees_from_profit = (profit * performance_fees) / CONSTANTS::WAD;
-                    let shares_to_mint = self._convert_to_shares(performance_fees_from_profit);
-                    let pooling_manager = self.pooling_manager.read();
-                    let pooling_manager_disp = IPoolingManagerDispatcher {
-                        contract_address: pooling_manager
-                    };
-                    let fees_recipient = pooling_manager_disp.fees_recipient();
-                    let token_disp = ITokenDispatcher { contract_address: token };
-                    token_disp.mint(fees_recipient, shares_to_mint);
-                }
+                self._check_profit_and_mint(profit, token);
 
                 let new_share_price = self._convert_to_assets(one_share_unit);
 
@@ -566,19 +553,7 @@ mod TokenManager {
                     self.buffer.write(remaining_buffer_mem);
                     self.underlying_transit.write(0);
 
-                    if (profit > 0) {
-                        let performance_fees = self.performance_fees.read();
-                        let performance_fees_from_profit = (profit * performance_fees)
-                            / CONSTANTS::WAD;
-                        let shares_to_mint = self._convert_to_shares(performance_fees_from_profit);
-                        let pooling_manager = self.pooling_manager.read();
-                        let pooling_manager_disp = IPoolingManagerDispatcher {
-                            contract_address: pooling_manager
-                        };
-                        let fees_recipient = pooling_manager_disp.fees_recipient();
-                        let token_disp = ITokenDispatcher { contract_address: token };
-                        token_disp.mint(fees_recipient, shares_to_mint);
-                    }
+                    self._check_profit_and_mint(profit, token);
 
                     let new_share_price = self._convert_to_assets(one_share_unit);
 
@@ -593,19 +568,7 @@ mod TokenManager {
                     self.buffer.write(0);
                     self.underlying_transit.write(remaining_buffer_mem);
 
-                    if (profit > 0) {
-                        let performance_fees = self.performance_fees.read();
-                        let performance_fees_from_profit = (profit * performance_fees)
-                            / CONSTANTS::WAD;
-                        let shares_to_mint = self._convert_to_shares(performance_fees_from_profit);
-                        let pooling_manager = self.pooling_manager.read();
-                        let pooling_manager_disp = IPoolingManagerDispatcher {
-                            contract_address: pooling_manager
-                        };
-                        let fees_recipient = pooling_manager_disp.fees_recipient();
-                        let token_disp = ITokenDispatcher { contract_address: token };
-                        token_disp.mint(fees_recipient, shares_to_mint);
-                    }
+                    self._check_profit_and_mint(profit, token);
 
                     let new_share_price = self._convert_to_assets(one_share_unit);
 
@@ -722,7 +685,7 @@ mod TokenManager {
         fn _set_deposit_limit(
             ref self: ContractState, new_deposit_limit_low: u256, new_deposit_limit_high: u256
         ) {
-            assert(new_deposit_limit_low > 0, Errors::ZERO_AMOUNT);
+            assert(new_deposit_limit_low.is_non_zero(), Errors::ZERO_AMOUNT);
             assert(new_deposit_limit_high > new_deposit_limit_low, Errors::INVALID_LIMIT);
             self.deposit_limit_low.write(new_deposit_limit_low);
             self.deposit_limit_high.write(new_deposit_limit_high);
@@ -752,6 +715,22 @@ mod TokenManager {
         fn _set_dust_limit(ref self: ContractState, new_dust_limit: u256) {
             assert(new_dust_limit.is_non_zero(), Errors::ZERO_AMOUNT);
             self.dust_limit.write(new_dust_limit);
+        }
+
+        fn _check_profit_and_mint(ref self: ContractState, profit: u256, token: ContractAddress) {
+            if (profit > 0) {
+                let performance_fees = self.performance_fees.read();
+                let performance_fees_from_profit = (profit * performance_fees)
+                    / CONSTANTS::WAD;
+                let shares_to_mint = self._convert_to_shares(performance_fees_from_profit);
+                let pooling_manager = self.pooling_manager.read();
+                let pooling_manager_disp = IPoolingManagerDispatcher {
+                    contract_address: pooling_manager
+                };
+                let fees_recipient = pooling_manager_disp.fees_recipient();
+                let token_disp = ITokenDispatcher { contract_address: token };
+                token_disp.mint(fees_recipient, shares_to_mint);
+            }
         }
     }
 }
