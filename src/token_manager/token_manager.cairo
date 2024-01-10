@@ -53,6 +53,7 @@ mod TokenManager {
         const INVALID_CALLER: felt252 = 'Invalid caller';
         const INVALID_FEES: felt252 = 'Fee amount too high';
         const ZERO_AMOUNT: felt252 = 'Amount nul';
+        const ZERO_ADDRESS: felt252 = 'Address is zero';
         const INVALID_LIMIT: felt252 = 'Invalid limit';
         const LOW_LIMIT: felt252 = 'Low limit reacher';
         const HIGH_LIMIT: felt252 = 'High limit reacher';
@@ -76,6 +77,7 @@ mod TokenManager {
         dust_limit: u256
     ) {
         self.pooling_manager.write(pooling_manager);
+        assert(l1_strategy.is_non_zero(), Errors::ZERO_ADDRESS);
         self.l1_strategy.write(l1_strategy);
         self.underlying.write(underlying);
         self._set_performance_fees(performance_fees);
