@@ -1,7 +1,8 @@
 #[starknet::contract]
 mod TokenManager {
     use starknet::{
-        ContractAddress, get_caller_address, get_contract_address, eth_address::EthAddress, Zeroable
+        ContractAddress, get_caller_address, get_contract_address, eth_address::EthAddress,
+        Zeroable, ClassHash
     };
 
 
@@ -10,6 +11,8 @@ mod TokenManager {
     use openzeppelin::access::accesscontrol::interface::{
         IAccessControlDispatcher, IAccessControlDispatcherTrait
     };
+    use openzeppelin::upgrades::UpgradeableComponent;
+
 
     use nimbora_yields::token_manager::interface::{ITokenManager, WithdrawalInfo, StrategyReportL2};
     use nimbora_yields::token::interface::{ITokenDispatcher, ITokenDispatcherTrait};
@@ -19,9 +22,15 @@ mod TokenManager {
 
     use nimbora_yields::utils::{CONSTANTS, MATH};
 
+    // Components
+    component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
+
+    impl InternalUpgradeableImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
     #[storage]
     struct Storage {
+        #[substorage(v0)]
+        upgradeable: UpgradeableComponent::Storage,
         pooling_manager: ContractAddress,
         l1_strategy: EthAddress,
         underlying: ContractAddress,
@@ -46,7 +55,10 @@ mod TokenManager {
 
     #[event]
     #[derive(Drop, starknet::Event)]
-    enum Event {}
+    enum Event {
+        #[flat]
+        UpgradeableEvent: UpgradeableComponent::Event
+    }
 
 
     mod Errors {
@@ -87,6 +99,13 @@ mod TokenManager {
         self._set_dust_limit(dust_limit);
     }
 
+    /// @notice Upgrade contract
+    /// @param New contract class hash
+    #[external(v0)]
+    fn upgrade(ref self: ContractState, new_class_hash: ClassHash) {
+        self._assert_only_owner();
+        self.upgradeable._upgrade(new_class_hash);
+    }
 
     #[abi(embed_v0)]
     impl TokenManager of ITokenManager<ContractState> {

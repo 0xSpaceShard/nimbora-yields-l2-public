@@ -4,6 +4,7 @@ use starknet::{ContractAddress, ClassHash, eth_address::EthAddress};
 trait IFactory<TContractState> {
     fn token_manager_class_hash(self: @TContractState) -> ClassHash;
     fn token_class_hash(self: @TContractState) -> ClassHash;
+    fn pooling_manager_address(self: @TContractState) -> ContractAddress;
 
     fn deploy_strategy(
         ref self: TContractState,

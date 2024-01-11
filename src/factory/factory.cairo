@@ -17,6 +17,7 @@ mod Factory {
         IAccessControlDispatcher, IAccessControlDispatcherTrait
     };
     use openzeppelin::token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
+    use openzeppelin::upgrades::UpgradeableComponent;
 
 
     // Local imports.
@@ -25,8 +26,15 @@ mod Factory {
         IPoolingManagerDispatcher, IPoolingManagerDispatcherTrait
     };
 
+    // Components
+    component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
+
+    impl InternalUpgradeableImpl = UpgradeableComponent::InternalImpl<ContractState>;
+
     #[storage]
     struct Storage {
+        #[substorage(v0)]
+        upgradeable: UpgradeableComponent::Storage,
         pooling_manager: ContractAddress,
         token_class_hash: ClassHash,
         token_manager_class_hash: ClassHash
@@ -36,6 +44,8 @@ mod Factory {
     #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
+        #[flat]
+        UpgradeableEvent: UpgradeableComponent::Event,
         TokenHashUpdated: TokenHashUpdated,
         TokenManagerHashUpdated: TokenManagerHashUpdated
     }
@@ -76,6 +86,13 @@ mod Factory {
         self._set_token_manager_class_hash(token_manager_class_hash);
     }
 
+    /// @notice Upgrade contract
+    /// @param New contract class hash
+    #[external(v0)]
+    fn upgrade(ref self: ContractState, new_class_hash: ClassHash) {
+        self._assert_only_owner();
+        self.upgradeable._upgrade(new_class_hash);
+    }
 
     #[abi(embed_v0)]
     impl Factory of IFactory<ContractState> {
@@ -89,6 +106,12 @@ mod Factory {
         /// @return The class hash of the token
         fn token_class_hash(self: @ContractState) -> ClassHash {
             self.token_class_hash.read()
+        }
+
+        /// @notice Reads the pooling manager contract address
+        /// @return The address of the pooling manager
+        fn pooling_manager_address(self: @ContractState) -> ContractAddress {
+            self.pooling_manager.read()
         }
 
         /// @notice Deploys a new strategy with specified parameters

@@ -1,11 +1,16 @@
 #[starknet::contract]
 mod Token {
     use openzeppelin::token::erc20::{ERC20Component, interface};
-    use starknet::{ContractAddress, get_caller_address};
+    use openzeppelin::upgrades::UpgradeableComponent;
+
+    use starknet::{ContractAddress, get_caller_address, ClassHash};
 
     use nimbora_yields::token::interface::{IToken};
 
     component!(path: ERC20Component, storage: erc20, event: ERC20Event);
+    component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
+
+    impl InternalUpgradeableImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
     #[abi(embed_v0)]
     impl ERC20Impl = ERC20Component::ERC20Impl<ContractState>;
@@ -17,6 +22,8 @@ mod Token {
     struct Storage {
         #[substorage(v0)]
         erc20: ERC20Component::Storage,
+        #[substorage(v0)]
+        upgradeable: UpgradeableComponent::Storage,
         token_manager: ContractAddress,
         decimals: u8
     }
@@ -25,7 +32,9 @@ mod Token {
     #[derive(Drop, starknet::Event)]
     enum Event {
         #[flat]
-        ERC20Event: ERC20Component::Event
+        ERC20Event: ERC20Component::Event,
+        #[flat]
+        UpgradeableEvent: UpgradeableComponent::Event
     }
 
     mod Errors {
@@ -51,6 +60,13 @@ mod Token {
         self.decimals.write(decimals);
     }
 
+    /// @notice Upgrade contract
+    /// @param New contract class hash
+    #[external(v0)]
+    fn upgrade(ref self: ContractState, new_class_hash: ClassHash) {
+        self._assert_only_token_manager();
+        self.upgradeable._upgrade(new_class_hash);
+    }
 
     #[abi(embed_v0)]
     impl Token of IToken<ContractState> {
