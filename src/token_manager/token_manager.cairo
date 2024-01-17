@@ -72,6 +72,7 @@ mod TokenManager {
         const NOT_OWNER: felt252 = 'Not owner';
         const WITHDRAWAL_NOT_REDY: felt252 = 'Withdrawal not ready';
         const ALREADY_CLAIMED: felt252 = 'Already claimed';
+        const ZERO_SHARES: felt252 = 'Shares is zero';
     }
 
     #[constructor]
@@ -244,6 +245,19 @@ mod TokenManager {
             self._withdrawal_exchange_rate(epoch)
         }
 
+        /// @notice Reads the withdrawal pool for a given epoch
+        /// @param epoch The epoch for which to read the withdrawal pool
+        /// @return The withdrawal pool for the specified epoch
+        fn withdrawal_pool(self: @ContractState, epoch: u256) -> u256 {
+            self.withdrawal_pool.read(epoch)
+        }
+
+        /// @notice Reads the withdrawal share for a given epoch
+        /// @param epoch The epoch for which to read the withdrawal share
+        /// @return The withdrawal share for the specified epoch
+        fn withdrawal_share(self: @ContractState, epoch: u256) -> u256 {
+            self.withdrawal_share.read(epoch)
+        }
 
         /// @notice Sets the token for this contract
         /// @dev Only callable by the pooling manager
@@ -360,11 +374,13 @@ mod TokenManager {
             let caller = get_caller_address();
             let this = get_contract_address();
             erc20_disp.transferFrom(caller, this, assets);
+
+            let shares = self._convert_to_shares(assets);
+
             let buffer = self.buffer.read();
             let new_buffer = buffer + assets;
             self.buffer.write(new_buffer);
 
-            let shares = self._convert_to_shares(assets);
             let token = self.token.read();
             let token_disp = ITokenDispatcher { contract_address: token };
             token_disp.mint(receiver, shares);
@@ -390,10 +406,10 @@ mod TokenManager {
             let token = self.token.read();
             let token_disp = ITokenDispatcher { contract_address: token };
             let caller = get_caller_address();
-            token_disp.burn(caller, shares);
 
             let epoch = self.epoch.read();
             let assets = self._convert_to_assets(shares);
+            token_disp.burn(caller, shares);
             let withdrawal_pool_share = (assets * CONSTANTS::WAD)
                 / self._withdrawal_exchange_rate(epoch);
 
@@ -428,6 +444,7 @@ mod TokenManager {
         fn claim_withdrawal(ref self: ContractState, id: u256) {
             let caller = get_caller_address();
             let withdrawal_info = self.withdrawal_info.read((caller, id));
+            assert(withdrawal_info.shares.is_non_zero(), Errors::ZERO_SHARES);
             assert(!withdrawal_info.claimed, Errors::ALREADY_CLAIMED);
             let handled_epoch_withdrawal_len = self.handled_epoch_withdrawal_len.read();
             assert(
@@ -573,7 +590,7 @@ mod TokenManager {
                     // We are fine
                     self.buffer.write(remaining_buffer_mem);
                     self.underlying_transit.write(0);
-
+                    
                     self._check_profit_and_mint(profit, token);
 
                     let new_share_price = self._convert_to_assets(one_share_unit);
@@ -588,9 +605,7 @@ mod TokenManager {
                     // We deposit underlying to L1
                     self.buffer.write(0);
                     self.underlying_transit.write(remaining_buffer_mem);
-
                     self._check_profit_and_mint(profit, token);
-
                     let new_share_price = self._convert_to_assets(one_share_unit);
 
                     StrategyReportL2 {
@@ -685,11 +700,7 @@ mod TokenManager {
         fn _withdrawal_exchange_rate(self: @ContractState, epoch: u256) -> u256 {
             let withdrawal_pool = self.withdrawal_pool.read(epoch);
             let withdrawal_share = self.withdrawal_share.read(epoch);
-            if (withdrawal_pool.is_zero()) {
-                0
-            } else {
-                (withdrawal_pool * CONSTANTS::WAD) / withdrawal_share
-            }
+            ((withdrawal_pool + 1) * CONSTANTS::WAD) / (withdrawal_share + 1)
         }
 
 

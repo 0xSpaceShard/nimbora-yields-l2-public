@@ -38,8 +38,8 @@ mod tests {
     use starknet::class_hash::Felt252TryIntoClassHash;
     use starknet::account::{Call};
     use snforge_std::{
-        declare, ContractClassTrait, get_class_hash, start_prank, CheatTarget, ContractClass, PrintTrait,
-        stop_prank, start_warp, stop_warp
+        declare, ContractClassTrait, get_class_hash, start_prank, CheatTarget, ContractClass,
+        PrintTrait, stop_prank, start_warp, stop_warp
     };
 
     use nimbora_yields::tests::test_utils::{
@@ -542,46 +542,46 @@ mod tests {
     #[test]
     #[should_panic(expected: ('Token not supported',))]
     fn deploy_strategy_unregister_bridge() {
-       let (
-        owner,
-        fees_recipient,
-        l1_pooling_manager,
-        pooling_manager,
-        factory,
-        token_hash,
-        token_manager_hash
-    ) =
-        setup_0();
-    let (token_1, token_2, token_3, bridge_1, bridge_2, bridge_3) = setup_1(
-        owner, l1_pooling_manager, pooling_manager, fees_recipient, factory
-    );
-
-    let l1_strategy_1: EthAddress = 2.try_into().unwrap();
-    let performance_fees_strategy_1 = 200000000000000000;
-    let min_deposit_1 = 100000000000000000;
-    let max_deposit_1 = 10000000000000000000;
-    let min_withdraw_1 = 200000000000000000;
-    let max_withdraw_1 = 2000000000000000000000000;
-    let withdrawal_epoch_delay_1 = 2;
-    let dust_limit_1 = 1000000000000000000;
-    let name_1 = 10;
-    let symbol_1 = 1000;
-
-    start_prank(CheatTarget::One(factory.contract_address), owner);
-    let (token_manager_deployed_address, token_deployed_address) = factory
-        .deploy_strategy(
-            l1_strategy_1,
-            token_2.contract_address,
-            name_1,
-            symbol_1,
-            performance_fees_strategy_1,
-            min_deposit_1,
-            max_deposit_1,
-            min_withdraw_1,
-            max_withdraw_1,
-            withdrawal_epoch_delay_1,
-            dust_limit_1
+        let (
+            owner,
+            fees_recipient,
+            l1_pooling_manager,
+            pooling_manager,
+            factory,
+            token_hash,
+            token_manager_hash
+        ) =
+            setup_0();
+        let (token_1, token_2, token_3, bridge_1, bridge_2, bridge_3) = setup_1(
+            owner, l1_pooling_manager, pooling_manager, fees_recipient, factory
         );
+
+        let l1_strategy_1: EthAddress = 2.try_into().unwrap();
+        let performance_fees_strategy_1 = 200000000000000000;
+        let min_deposit_1 = 100000000000000000;
+        let max_deposit_1 = 10000000000000000000;
+        let min_withdraw_1 = 200000000000000000;
+        let max_withdraw_1 = 2000000000000000000000000;
+        let withdrawal_epoch_delay_1 = 2;
+        let dust_limit_1 = 1000000000000000000;
+        let name_1 = 10;
+        let symbol_1 = 1000;
+
+        start_prank(CheatTarget::One(factory.contract_address), owner);
+        let (token_manager_deployed_address, token_deployed_address) = factory
+            .deploy_strategy(
+                l1_strategy_1,
+                token_2.contract_address,
+                name_1,
+                symbol_1,
+                performance_fees_strategy_1,
+                min_deposit_1,
+                max_deposit_1,
+                min_withdraw_1,
+                max_withdraw_1,
+                withdrawal_epoch_delay_1,
+                dust_limit_1
+            );
 
         stop_prank(CheatTarget::One(factory.contract_address));
     }

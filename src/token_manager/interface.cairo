@@ -40,6 +40,8 @@ trait ITokenManager<TContractState> {
     fn total_assets(self: @TContractState) -> u256;
     fn total_underlying_due(self: @TContractState) -> u256;
     fn withdrawal_exchange_rate(self: @TContractState, epoch: u256) -> u256;
+    fn withdrawal_pool(self: @TContractState, epoch: u256) -> u256;
+    fn withdrawal_share(self: @TContractState, epoch: u256) -> u256;
 
 
     fn initialiser(ref self: TContractState, token: ContractAddress);

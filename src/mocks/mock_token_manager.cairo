@@ -251,6 +251,20 @@ mod MockTokenManager {
             self._withdrawal_exchange_rate(epoch)
         }
 
+        /// @notice Reads the withdrawal pool for a given epoch
+        /// @param epoch The epoch for which to read the withdrawal pool
+        /// @return The withdrawal pool for the specified epoch
+        fn withdrawal_pool(self: @ContractState, epoch: u256) -> u256 {
+            self.withdrawal_pool.read(epoch)
+        }
+
+        /// @notice Reads the withdrawal share for a given epoch
+        /// @param epoch The epoch for which to read the withdrawal share
+        /// @return The withdrawal share for the specified epoch
+        fn withdrawal_share(self: @ContractState, epoch: u256) -> u256 {
+            self.withdrawal_share.read(epoch)
+        }
+
 
         /// @notice Sets the token for this contract
         /// @dev Only callable by the pooling manager
