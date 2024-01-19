@@ -673,7 +673,7 @@ mod MockPoolingManager {
                 );
         }
 
-        fn delete_all_pending_strategy_to_initialize(ref self: ContractState) {
+        fn delete_all_pending_strategy(ref self: ContractState) {
             self.accesscontrol.assert_only_role(0);
             let mut i = 0;
             let pending_strategies_to_initialize_len = self

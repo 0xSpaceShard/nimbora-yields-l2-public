@@ -411,7 +411,7 @@ mod tests {
         let (token_1, token_2, token_3, bridge_1, bridge_2, bridge_3) = setup_1(
             owner, l1_pooling_manager, pooling_manager, fees_recipient, factory
         );
-        pooling_manager.register_underlying(token_1.contract_address, bridge_1.contract_address);
+        pooling_manager.register_underlying(token_1.contract_address, bridge_1.contract_address, 5);
     }
 
     #[test]
@@ -432,7 +432,7 @@ mod tests {
         );
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), owner);
-        pooling_manager.register_underlying(Zeroable::zero(), bridge_1.contract_address);
+        pooling_manager.register_underlying(Zeroable::zero(), bridge_1.contract_address, 5);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
     }
 
@@ -454,7 +454,7 @@ mod tests {
         );
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), owner);
-        pooling_manager.register_underlying(token_1.contract_address, Zeroable::zero());
+        pooling_manager.register_underlying(token_1.contract_address, Zeroable::zero(), 5);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
     }
 
@@ -475,7 +475,7 @@ mod tests {
         );
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), owner);
-        pooling_manager.register_underlying(token_1.contract_address, bridge_1.contract_address);
+        pooling_manager.register_underlying(token_1.contract_address, bridge_1.contract_address, 5);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         let underlying_to_bridge = pooling_manager.underlying_to_bridge(token_1.contract_address);
