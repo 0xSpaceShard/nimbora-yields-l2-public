@@ -590,7 +590,7 @@ mod TokenManager {
                     // We are fine
                     self.buffer.write(remaining_buffer_mem);
                     self.underlying_transit.write(0);
-                    
+
                     self._check_profit_and_mint(profit, token);
 
                     let new_share_price = self._convert_to_assets(one_share_unit);
@@ -606,6 +606,10 @@ mod TokenManager {
                     self.buffer.write(0);
                     self.underlying_transit.write(remaining_buffer_mem);
                     self._check_profit_and_mint(profit, token);
+                    let underlying_disp = ERC20ABIDispatcher {
+                        contract_address: self.underlying.read()
+                    };
+                    underlying_disp.transfer(self.pooling_manager.read(), remaining_buffer_mem);
                     let new_share_price = self._convert_to_assets(one_share_unit);
 
                     StrategyReportL2 {
