@@ -2,8 +2,6 @@
 
 yarn
 
-cp ../nimbora-yields-l1-public/configs.json l1-configs.json
-
 echo Install scarb
 curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh
 scarb --version

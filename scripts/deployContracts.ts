@@ -1,7 +1,7 @@
-import { Account, Provider, Contract, json, uint256, RpcProvider, constants } from "starknet";
+import { Account, Contract, json, RpcProvider, constants } from "starknet";
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { appendToEnv, readConfigs, writeConfigs } from "./utils";
+import { readConfigs, writeConfigs } from "./utils";
 
 dotenv.config({ path: __dirname + '/../.env' })
 
@@ -20,7 +20,7 @@ async function deployPoolingManagerContract(): Promise<Contract> {
         },
     });
     [contractAddress] = contract_address;
-    // await provider.waitForTransaction(transaction_hash);
+    await provider.waitForTransaction(transaction_hash);
     const poolingManagerContract = new Contract(compiledContract.abi, contractAddress, owner);
     console.log('✅ Test PoolingManager contract connected at =', poolingManagerContract.address);
 
@@ -48,7 +48,7 @@ async function deployFactoryContract(): Promise<Contract> {
         },
     });
     [contractAddress] = contract_address;
-    // await provider.waitForTransaction(transaction_hash);
+    await provider.waitForTransaction(transaction_hash);
 
     const factoryContract = new Contract(compiledContract.abi, contractAddress, owner);
     console.log('✅ Test Factory contract connected at =', factoryContract.address);
