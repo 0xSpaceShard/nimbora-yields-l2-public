@@ -9,12 +9,14 @@ const network = process.env.STARKNET_NETWORK || ''
 
 const provider = new RpcProvider({ nodeUrl: network == "mainnet" ? constants.NetworkName.SN_MAIN : constants.NetworkName.SN_GOERLI });
 const owner = new Account(provider, process.env.ACCOUNT_ADDRESS as string, process.env.ACCOUNT_PK as string, "1");
+const { POOLING_MANAGER_CLASS_HASH, FACTORY_CLASS_HASH, TOKEN_CLASS_HASH, TOKEN_MANAGER_CLASS_HASH } = readConfigs()[network]
 
 async function deployPoolingManagerContract(): Promise<Contract> {
+
     let contractAddress: any;
     const compiledContract = await json.parse(fs.readFileSync(`./target/dev/nimbora_yields_PoolingManager.contract_class.json`).toString('ascii'));
     let { transaction_hash, contract_address } = await owner.deploy({
-        classHash: process.env.POOLING_MANAGER_CLASS_HASH as string,
+        classHash: POOLING_MANAGER_CLASS_HASH as string,
         constructorCalldata: {
             owner: owner.address,
         },
@@ -40,11 +42,11 @@ async function deployFactoryContract(): Promise<Contract> {
     const l2PoolingManager = configs[network].l2PoolingManager;
 
     let { transaction_hash, contract_address } = await owner.deploy({
-        classHash: process.env.FACTORY_CLASS_HASH as string,
+        classHash: FACTORY_CLASS_HASH as string,
         constructorCalldata: {
             pooling_manager: l2PoolingManager as string,
-            token_class_hash: process.env.TOKEN_CLASS_HASH as string,
-            token_manager_class_hash: process.env.TOKEN_MANAGER_CLASS_HASH as string,
+            token_class_hash: TOKEN_CLASS_HASH as string,
+            token_manager_class_hash: TOKEN_MANAGER_CLASS_HASH as string,
         },
     });
     [contractAddress] = contract_address;
