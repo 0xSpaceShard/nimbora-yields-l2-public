@@ -79,12 +79,12 @@ You can do the setup through voyager or starkscan.
 
 **PoolingManager:**
 Only Owner:
-- set_fees_recipient: Address of the fees recipient.
-- set_l1_pooling_manager: Address of the pooling manager on l1.
-- set_factory: Address of the Factory contract previously deployed.
+- `set_fees_recipient`: Address of the fees recipient.
+- `set_l1_pooling_manager`: Address of the pooling manager on l1.
+- `set_factory`: Address of the Factory contract previously deployed.
 
 Only Role, the owner has the correct role, but you can also give permission to other accounts:
-- register_underlying: Registers an underlying asset, its corresponding bridge contract and the corresponding address of the l1bridge
+- `register_underlying`: Registers an underlying asset, its corresponding bridge contract and the corresponding address of the l1bridge
 
 **Factory:**
 Only Owner:
@@ -94,14 +94,21 @@ Parameters are:
     - underlying: The contract address of the underlying asset
     - token_name: The name for the new token
     - token_symbol: The symbol for the new token
-    - performance_fees: The performance fees for the strategy
-    - min_deposit: The minimum deposit limit
-    - max_deposit: The maximum deposit limit
-    - min_withdrawal: The minimum withdrawal limit
-    - max_withdrawal: The maximum withdrawal limit
-    - withdrawal_epoch_delay: The delay in epochs for withdrawals
-    - dust_limit: The dust limit for the strategy
-Deploy_strategy will deploy a new contract called token_manager and return you the address. We are going to use this contract to deposit some tokens.
+    - performance_fees: The performance fees for the strategy (ex: 200000000000000000)
+    - min_deposit: The minimum deposit limit (ex: 100000000000000000)
+    - max_deposit: The maximum deposit limit (ex: 10000000000000000000)
+    - min_withdrawal: The minimum withdrawal limit (ex: 200000000000000000)
+    - max_withdrawal: The maximum withdrawal limit (ex: 2000000000000000000000000)
+    - withdrawal_epoch_delay: The delay in epochs for withdrawals (ex: 2)
+    - dust_limit: The dust limit for the strategy (ex: 1000000000000000000)
+Deploy_strategy will deploy a new contract called token_manager and return you the address inside the emitted event. We are going to use this contract to deposit some tokens.
+
+You need to approve `tokenManager` to transfer some underlying token. If you are using `DAI` token, you will also need to give some approval to `daiBridge`. For that you can use the function:
+- `set_allowance` in our `PoolingManager` contract.
+Parameters are:
+    - spender: The l2 bridge contract for this token.
+    - token_address: The l2 token address.
+    - amount: The amount you want to bridge.
 
 Go to the Token Manager contract address and call the deposit function, This function can be called by any user :
 
@@ -115,6 +122,12 @@ Once users have deposited some assets, they can now request a withdrawal from th
 - `request_withdrawal`: Allows a user to request a withdrawal from the contract
 Parameter is:
     - shares: The amount of shares to withdraw.
+
+Now that user had deposit some assets, you can call go in our PoolingManager contract and call:
+- `handle_mass_report`: Handles a mass report of L1 strategy data, processing and updating L2 state accordingly.
+This function processes reports from L1, verifies data integrity, and performs necessary transfers and updates.
+Parameters are:
+    - calldata: The span of StrategyReportL1 data received from L1 (for epoch 0 it is an empty array [])
 
 ### Goerli Class Hash
 You can declare a contract only once on each network. So if you don't do any modification into our current contract implementation you may face an error while declaring. Therefore here you can find the current class hash of each contract on Goerli.
