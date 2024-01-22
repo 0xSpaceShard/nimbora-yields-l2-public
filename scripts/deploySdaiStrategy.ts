@@ -1,7 +1,7 @@
 import { Account, Contract, json, RpcProvider, constants } from "starknet";
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { readConfigs } from "./utils";
+import { readConfigs, writeConfigs } from "./utils";
 
 dotenv.config({ path: __dirname + '/../.env' })
 
@@ -14,7 +14,7 @@ async function deployStrategy() {
     const l1Configs = readConfigs("l1-configs.json")
     // const l1Configs = readConfigs("../nimbora_yields_l1/configs.json")
     const configs = readConfigs()
-    const { factory, dai } = configs[network]
+    const { l2PoolingManager, factory, dai } = configs[network]
     const compiledContract = await json.parse(fs.readFileSync(`./target/dev/nimbora_yields_Factory.contract_class.json`).toString('ascii'));
     const factoryContract = new Contract(compiledContract.abi, factory, owner);
     factoryContract.connect(owner)
@@ -31,8 +31,16 @@ async function deployStrategy() {
         "0x2", // withdrawal_epoch_delay
         "0xde0b6b3a7640000",// dust_limit
     ])
-    await provider.waitForTransaction(res.transaction_hash);
-    console.log("Factory: Strategy deployed")
+    const txReceipt = await provider.waitForTransaction(res.transaction_hash);
+    console.log("Factory: Strategy deployed");
+
+    const compiledContractPoolingManager = await json.parse(fs.readFileSync(`./target/dev/nimbora_yields_PoolingManager.contract_class.json`).toString('ascii'));
+    const poolingManagerContract = new Contract(compiledContractPoolingManager.abi, l2PoolingManager, owner);
+    const listEvents = poolingManagerContract.parseEvents(txReceipt);
+    configs[network].sdaiStrategy = "0x" + listEvents[0].StrategyRegistered.token_manager.toString(16)
+    writeConfigs(configs)
+    console.log("Pooling Manager: Strategy deployed")
+
 }
 
 async function main() {

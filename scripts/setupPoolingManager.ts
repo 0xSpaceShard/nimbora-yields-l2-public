@@ -31,12 +31,12 @@ async function setup() {
     res = await poolingManagerContract.invoke('grant_role', ["0x0", owner.address])
     await provider.waitForTransaction(res.transaction_hash);
     console.log("Pooling Manager: grant role to owner")
-    
+
     res = await poolingManagerContract.invoke('set_fees_recipient', [owner.address])
     await provider.waitForTransaction(res.transaction_hash);
     console.log("Pooling Manager: set_fees_recipient")
 
-    res = await poolingManagerContract.invoke('set_allowance', [l2PoolingManager, dai, uint256.bnToUint256('1000000000000000000000000')])
+    res = await poolingManagerContract.invoke('set_allowance', [l2DaiBridge, dai, uint256.bnToUint256('1000000000000000000000000')])
     await provider.waitForTransaction(res.transaction_hash);
     console.log("Pooling Manager: set_allowance DAI")
 
