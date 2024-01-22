@@ -22,4 +22,14 @@ starkliup
 echo
 starkli --version
 
+echo Install jq
+if [[ "$OSTYPE" =~ ^darwin ]]; then
+    brew install jq
+fi
+
+if [[ "$OSTYPE" =~ ^linux ]]; then
+    sudo apt-get update
+    sudo apt-get install jq
+fi
+
 cp .env.example .env
