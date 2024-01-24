@@ -12,6 +12,10 @@ jobs:
 
       - name: Setup scarb
         run: curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh -s -- -v 2.4.4
+
+      - name: Setup snforge
+        run: curl -L https://raw.githubusercontent.com/foundry-rs/starknet-foundry/master/scripts/install.sh | sh && foundryup
+
       
       - name: Setup env
         run: cp .env.example .env
