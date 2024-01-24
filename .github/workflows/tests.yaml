@@ -1,0 +1,23 @@
+name: test
+on:
+  pull_request:
+    branches: 
+      - master 
+      - develop
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup scarb
+        run: curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh -s -- -v 2.4.4
+      
+      - name: Setup env
+        run: cp .env.example .env
+
+      - name: Compile contracts
+        run: scarb build
+
+      - name: Run tests
+        run: scarb test
