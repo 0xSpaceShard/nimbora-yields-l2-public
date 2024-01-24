@@ -2,28 +2,23 @@
 /// @notice Responsible for deploying strategies and their associated tokens.
 #[starknet::contract]
 mod Factory {
+    use core::poseidon::poseidon_hash_span;
     // Core lib imports.
     use core::result::ResultTrait;
-    use starknet::{
-        get_caller_address, ContractAddress, contract_address_const, ClassHash,
-        eth_address::EthAddress, Zeroable
-    };
-    use starknet::syscalls::deploy_syscall;
-    use core::poseidon::poseidon_hash_span;
-
-
-    // OZ imports
-    use openzeppelin::access::accesscontrol::interface::{
-        IAccessControlDispatcher, IAccessControlDispatcherTrait
-    };
-    use openzeppelin::token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
-    use openzeppelin::upgrades::UpgradeableComponent;
 
 
     // Local imports.
     use nimbora_yields::factory::interface::{IFactory};
-    use nimbora_yields::pooling_manager::interface::{
-        IPoolingManagerDispatcher, IPoolingManagerDispatcherTrait
+    use nimbora_yields::pooling_manager::interface::{IPoolingManagerDispatcher, IPoolingManagerDispatcherTrait};
+
+
+    // OZ imports
+    use openzeppelin::access::accesscontrol::interface::{IAccessControlDispatcher, IAccessControlDispatcherTrait};
+    use openzeppelin::token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
+    use openzeppelin::upgrades::UpgradeableComponent;
+    use starknet::syscalls::deploy_syscall;
+    use starknet::{
+        get_caller_address, ContractAddress, contract_address_const, ClassHash, eth_address::EthAddress, Zeroable
     };
 
     // Components
@@ -194,10 +189,7 @@ mod Factory {
             let decimals = token_disp.decimals();
 
             let mut constructor_token_calldata = array![
-                token_manager_deployed_address.into(),
-                token_name.into(),
-                token_symbol.into(),
-                decimals.into()
+                token_manager_deployed_address.into(), token_name.into(), token_symbol.into(), decimals.into()
             ];
 
             let (token_deployed_address, _) = deploy_syscall(
@@ -226,17 +218,12 @@ mod Factory {
         /// @notice Sets a new class hash for the token manager
         /// @dev Only callable by the owner of the contract
         /// @param new_token_manager_class_hash The new class hash to be set for the token manager
-        fn set_token_manager_class_hash(
-            ref self: ContractState, new_token_manager_class_hash: ClassHash,
-        ) {
+        fn set_token_manager_class_hash(ref self: ContractState, new_token_manager_class_hash: ClassHash,) {
             self._assert_only_owner();
             self._set_token_manager_class_hash(new_token_manager_class_hash);
             let pooling_manager = self.pooling_manager.read();
-            let pooling_manager_disp = IPoolingManagerDispatcher {
-                contract_address: pooling_manager
-            };
-            pooling_manager_disp
-                .emit_token_manager_class_hash_updated_event(new_token_manager_class_hash);
+            let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
+            pooling_manager_disp.emit_token_manager_class_hash_updated_event(new_token_manager_class_hash);
         }
 
         /// @notice Sets a new class hash for the token
@@ -246,9 +233,7 @@ mod Factory {
             self._assert_only_owner();
             self._set_token_class_hash(new_token_class_hash);
             let pooling_manager = self.pooling_manager.read();
-            let pooling_manager_disp = IPoolingManagerDispatcher {
-                contract_address: pooling_manager
-            };
+            let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
             pooling_manager_disp.emit_token_class_hash_updated_event(new_token_class_hash);
         }
 

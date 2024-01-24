@@ -1,4 +1,4 @@
-import { Account, Provider, Contract, json, RpcProvider, constants } from 'starknet';
+import { Account, json, RpcProvider, constants } from 'starknet';
 import fs from 'fs';
 import dotenv from 'dotenv';
 
