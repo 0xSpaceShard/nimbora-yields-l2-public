@@ -606,7 +606,6 @@ mod TokenManager {
                     self.buffer.write(0);
                     self.underlying_transit.write(remaining_buffer_mem);
                     self._check_profit_and_mint(profit, token);
-                    assert(self.underlying.read().is_non_zero(), 'ZERO UND');
                     let underlying_disp = ERC20ABIDispatcher {
                         contract_address: self.underlying.read()
                     };
