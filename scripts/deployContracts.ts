@@ -47,7 +47,7 @@ async function deployPoolingManagerContract(): Promise<Contract> {
     },
   });
   [contractAddress] = contract_address;
-  // await provider.waitForTransaction(transaction_hash);
+  await provider.waitForTransaction(transaction_hash);
   const poolingManagerContract = new Contract(
     compiledContract.abi,
     contractAddress,
@@ -87,7 +87,7 @@ async function deployFactoryContract(): Promise<Contract> {
     },
   });
   [contractAddress] = contract_address;
-  // await provider.waitForTransaction(transaction_hash);
+  await provider.waitForTransaction(transaction_hash);
 
   const factoryContract = new Contract(
     compiledContract.abi,
