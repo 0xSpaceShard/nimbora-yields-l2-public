@@ -550,6 +550,15 @@ mod MockPoolingManager {
                     break ();
                 }
                 let elem = *full_strategy_report_l1.at(i);
+                if(!elem.processed){
+                    strategy_report_l2_array.append(StrategyReportL2{
+                        l1_strategy: elem.l1_strategy,
+                        action_id: elem.l1_net_asset_value,
+                        amount: elem.underlying_bridged_amount,
+                        new_share_price: 0
+                    });
+                    continue;
+                }
                 let strategy = self.l1_strategy_to_token_manager.read(elem.l1_strategy);
                 let strategy_disp = ITokenManagerDispatcher { contract_address: strategy };
                 let underlying = strategy_disp.underlying();
@@ -949,6 +958,11 @@ mod MockPoolingManager {
                 ret_array.append(l1_strategy_u256);
                 ret_array.append(elem.l1_net_asset_value);
                 ret_array.append(elem.underlying_bridged_amount);
+                if(elem.processed){
+                    ret_array.append(1);
+                } else {
+                    ret_array.append(0);
+                }
                 i += 1;
             };
             ret_array.span()
@@ -969,7 +983,7 @@ mod MockPoolingManager {
         ) -> Span<u256> {
             let mut ret_array = ArrayTrait::new();
             ret_array.append(new_epoch);
-            let array_len = bridge_deposit_info.len();
+            let mut array_len = bridge_deposit_info.len();
             let mut i = 0;
             loop {
                 if (i == array_len) {
@@ -979,14 +993,31 @@ mod MockPoolingManager {
                 let l1_bridge_u256: u256 = bridge_deposit_info_elem.l1_bridge.into();
                 ret_array.append(l1_bridge_u256);
                 ret_array.append(bridge_deposit_info_elem.amount);
+                i += 1;
+            };
 
+            array_len = strategy_report_l2.len();
+            i = 0;
+            loop {
+                if (i == array_len) {
+                    break ();
+                }
                 let strategy_report_l2_elem = *strategy_report_l2.at(i);
                 let l1_strategy_felt: felt252 = strategy_report_l2_elem.l1_strategy.into();
                 let l1_strategy_u256: u256 = l1_strategy_felt.into();
                 ret_array.append(l1_strategy_u256);
                 ret_array.append(strategy_report_l2_elem.action_id);
                 ret_array.append(strategy_report_l2_elem.amount);
+                ret_array.append(1);
+                i += 1;
+            };
 
+            array_len = bridge_withdrawal_info.len();
+            i = 0;
+            loop {
+                if (i == array_len) {
+                    break ();
+                }
                 let bridge_withdrawal_info_elem = *bridge_withdrawal_info.at(i);
                 let l1_bridge_u256: u256 = bridge_withdrawal_info_elem.l1_bridge.into();
                 ret_array.append(l1_bridge_u256);
@@ -995,6 +1026,7 @@ mod MockPoolingManager {
             };
             ret_array.span()
         }
+
 
         /// @notice Generates a hash from L1 data
         /// @param calldata Span of StrategyReportL1 data
@@ -1077,7 +1109,7 @@ mod MockPoolingManager {
                 let buffer = token_manager_disp.buffer();
                 assert(buffer.is_non_zero(), Errors::BUFFER_NUL);
                 let new_elem = StrategyReportL1 {
-                    l1_strategy: l1_strategy, l1_net_asset_value: 0, underlying_bridged_amount: 0
+                    l1_strategy: l1_strategy, l1_net_asset_value: 0, underlying_bridged_amount: 0, processed: true
                 };
                 ret_array.append(new_elem);
                 i += 1;
