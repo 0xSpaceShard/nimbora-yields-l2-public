@@ -1,7 +1,46 @@
+use starknet::{ContractAddress, ClassHash, eth_address::EthAddress};
+
+#[starknet::interface]
+trait IMockFactory<TContractState> {
+    fn token_manager_class_hash(self: @TContractState) -> ClassHash;
+    fn token_class_hash(self: @TContractState) -> ClassHash;
+    fn pooling_manager_address(self: @TContractState) -> ContractAddress;
+
+    fn deploy_strategy(
+        ref self: TContractState,
+        l1_strategy: EthAddress,
+        underlying: ContractAddress,
+        token_name: felt252,
+        token_symbol: felt252,
+        performance_fees: u256,
+        min_deposit: u256,
+        max_deposit: u256,
+        min_withdrawal: u256,
+        max_withdrawal: u256,
+        withdrawal_epoch_delay: u256,
+        dust_limit: u256
+    ) -> (ContractAddress, ContractAddress);
+
+    fn set_token_manager_class_hash(
+        ref self: TContractState, new_token_manager_class_hash: ClassHash
+    );
+
+    fn set_token_class_hash(ref self: TContractState, new_token_class_hash: ClassHash);
+    fn compute_salt_for_strategy(
+            self: @TContractState,
+            l1_strategy: EthAddress,
+            underlying: ContractAddress,
+            token_name: felt252,
+            token_symbol: felt252
+        ) -> (felt252, felt252);
+}
+
+
 /// @title Factory Module
 /// @notice Responsible for deploying strategies and their associated tokens.
 #[starknet::contract]
 mod MockFactory {
+    use super::IMockFactory;
     // Core lib imports.
     use core::result::ResultTrait;
     use starknet::{
@@ -21,7 +60,6 @@ mod MockFactory {
 
 
     // Local imports.
-    use nimbora_yields::factory::interface::{IFactory};
     use nimbora_yields::pooling_manager::interface::{
         IPoolingManagerDispatcher, IPoolingManagerDispatcherTrait
     };
@@ -102,7 +140,7 @@ mod MockFactory {
     }
 
     #[abi(embed_v0)]
-    impl Factory of IFactory<ContractState> {
+    impl Factory of IMockFactory<ContractState> {
         /// @notice Reads the class hash of the token manager
         /// @return The class hash of the token manager
         fn token_manager_class_hash(self: @ContractState) -> ClassHash {
@@ -151,7 +189,7 @@ mod MockFactory {
         ) -> (ContractAddress, ContractAddress) {
             self._assert_only_owner();
             let (token_manager_salt, token_salt) = self
-                ._compute_salt_for_strategy(l1_strategy, underlying, token_name, token_symbol);
+                .compute_salt_for_strategy(l1_strategy, underlying, token_name, token_symbol);
             let pooling_manager = self.pooling_manager.read();
             let mut constructor_token_manager_calldata = array![
                 pooling_manager.into(),
@@ -242,21 +280,6 @@ mod MockFactory {
             };
             pooling_manager_disp.emit_token_class_hash_updated_event(new_token_class_hash);
         }
-    }
-
-
-    #[generate_trait]
-    impl InternalImpl of InternalTrait {
-        /// @notice Asserts that the caller has the owner role
-        /// @dev Verifies the caller's role using the Access Control Dispatcher
-        fn _assert_only_owner(self: @ContractState) {
-            let caller = get_caller_address();
-            let pooling_manager = self.pooling_manager.read();
-            let access_disp = IAccessControlDispatcher { contract_address: pooling_manager };
-            let has_role = access_disp.has_role(0, caller);
-            assert(has_role, Errors::INVALID_CALLER);
-        }
-
 
         /// @notice Computes the salts for token manager and token based on strategy parameters
         /// @param l1_strategy The Ethereum address of the L1 strategy
@@ -264,7 +287,7 @@ mod MockFactory {
         /// @param token_name The name of the token
         /// @param token_symbol The symbol of the token
         /// @return A tuple containing the salts for the token manager and token
-        fn _compute_salt_for_strategy(
+        fn compute_salt_for_strategy(
             self: @ContractState,
             l1_strategy: EthAddress,
             underlying: ContractAddress,
@@ -285,7 +308,19 @@ mod MockFactory {
 
             (token_manager_salt, token_salt)
         }
+    }
 
+    #[generate_trait]
+    impl InternalImpl of InternalTrait {
+        /// @notice Asserts that the caller has the owner role
+        /// @dev Verifies the caller's role using the Access Control Dispatcher
+        fn _assert_only_owner(self: @ContractState) {
+            let caller = get_caller_address();
+            let pooling_manager = self.pooling_manager.read();
+            let access_disp = IAccessControlDispatcher { contract_address: pooling_manager };
+            let has_role = access_disp.has_role(0, caller);
+            assert(has_role, Errors::INVALID_CALLER);
+        }
 
         /// @notice Sets the class hash for the token manager
         /// @dev Ensures that the provided class hash is non-zero before updating
