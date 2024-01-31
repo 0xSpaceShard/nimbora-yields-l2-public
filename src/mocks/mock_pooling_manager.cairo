@@ -496,7 +496,6 @@ mod MockPoolingManager {
                 underlying.is_non_zero() && bridge.is_non_zero() && l1_bridge.is_non_zero(),
                 Errors::ZERO_ADDRESS
             );
-            let bridge_disp = ITokenBridgeDispatcher { contract_address: bridge };
             self.underlying_to_bridge.write(underlying, bridge);
             // let l1_bridge = bridge_disp.get_l1_bridge();
             self.l2_bridge_to_l1_bridge.write(bridge, l1_bridge);
