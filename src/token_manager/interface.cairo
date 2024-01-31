@@ -8,6 +8,14 @@ struct WithdrawalInfo {
     claimed: bool
 }
 
+impl WithdrawalInfoIntoSpan of Into<WithdrawalInfo, Span<felt252>> {
+    fn into(self: WithdrawalInfo) -> Span<felt252> {
+        let mut serialized_struct: Array<felt252> = array![];
+        self.serialize(ref serialized_struct);
+        serialized_struct.span()
+    }
+}
+
 #[derive(Copy, Drop, Serde)]
 struct StrategyReportL2 {
     l1_strategy: EthAddress,
