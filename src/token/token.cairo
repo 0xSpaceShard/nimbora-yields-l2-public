@@ -15,6 +15,8 @@ mod Token {
     #[abi(embed_v0)]
     impl ERC20Impl = ERC20Component::ERC20Impl<ContractState>;
     #[abi(embed_v0)]
+    impl ERC20CamelOnlyImpl = ERC20Component::ERC20CamelOnlyImpl<ContractState>;
+    #[abi(embed_v0)]
     impl ERC20MetadataImpl = ERC20Component::ERC20MetadataImpl<ContractState>;
     impl ERC20InternalImpl = ERC20Component::InternalImpl<ContractState>;
 
@@ -84,9 +86,9 @@ mod Token {
         /// @dev Only callable by the token manager
         /// @param account The address of the account from which tokens will be burned
         /// @param amount The amount of tokens to burn
-        fn burn(ref self: ContractState, acccount: ContractAddress, amount: u256) {
+        fn burn(ref self: ContractState, account: ContractAddress, amount: u256) {
             self._assert_only_token_manager();
-            self.erc20._burn(acccount, amount);
+            self.erc20._burn(account, amount);
         }
     }
 
