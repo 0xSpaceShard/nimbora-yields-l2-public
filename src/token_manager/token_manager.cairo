@@ -67,12 +67,13 @@ mod TokenManager {
         const ZERO_AMOUNT: felt252 = 'Amount nul';
         const ZERO_ADDRESS: felt252 = 'Address is zero';
         const INVALID_LIMIT: felt252 = 'Invalid limit';
-        const LOW_LIMIT: felt252 = 'Low limit reacher';
-        const HIGH_LIMIT: felt252 = 'High limit reacher';
+        const LOW_LIMIT: felt252 = 'Low limit reached';
+        const HIGH_LIMIT: felt252 = 'High limit reached';
         const NOT_OWNER: felt252 = 'Not owner';
         const WITHDRAWAL_NOT_REDY: felt252 = 'Withdrawal not ready';
         const ALREADY_CLAIMED: felt252 = 'Already claimed';
-        const ZERO_SHARES: felt252 = 'Shares is zero';
+        const INVALID_ID: felt252 = 'Invalid Id';
+        
     }
 
     #[constructor]
@@ -410,11 +411,13 @@ mod TokenManager {
             let epoch = self.epoch.read();
             let assets = self._convert_to_assets(shares);
             token_disp.burn(caller, shares);
-            let withdrawal_pool_share = (assets * CONSTANTS::WAD)
-                / self._withdrawal_exchange_rate(epoch);
 
             let withdrawal_pool = self.withdrawal_pool.read(epoch);
             let withdrawal_share = self.withdrawal_share.read(epoch);
+
+            let withdrawal_pool_share = (assets * CONSTANTS::WAD)
+                / self._withdrawal_exchange_rate_calc(withdrawal_pool, withdrawal_share);
+
             self.withdrawal_pool.write(epoch, withdrawal_pool + assets);
             self.withdrawal_share.write(epoch, withdrawal_share + withdrawal_pool_share);
 
@@ -425,6 +428,7 @@ mod TokenManager {
                     (caller, user_withdrawal_len),
                     WithdrawalInfo { shares: shares, epoch: epoch, claimed: false }
                 );
+            self.user_withdrawal_len.write(caller, user_withdrawal_len + 1);
 
             let l1_strategy = self.l1_strategy.read();
             let pooling_manager = self.pooling_manager.read();
@@ -443,8 +447,9 @@ mod TokenManager {
         /// @param id The unique identifier of the withdrawal request
         fn claim_withdrawal(ref self: ContractState, id: u256) {
             let caller = get_caller_address();
+            let user_withdrawal_len = self.user_withdrawal_len(caller);
+            assert(user_withdrawal_len > id, Errors::INVALID_ID);
             let withdrawal_info = self.withdrawal_info.read((caller, id));
-            assert(withdrawal_info.shares.is_non_zero(), Errors::ZERO_SHARES);
             assert(!withdrawal_info.claimed, Errors::ALREADY_CLAIMED);
             let handled_epoch_withdrawal_len = self.handled_epoch_withdrawal_len.read();
             assert(
@@ -460,11 +465,11 @@ mod TokenManager {
                     }
                 );
 
-            let withdrawal_exchange_rate = self._withdrawal_exchange_rate(withdrawal_info.epoch);
-            let assets = (withdrawal_exchange_rate * withdrawal_info.shares) / CONSTANTS::WAD;
-
             let withdrawal_pool = self.withdrawal_pool.read(withdrawal_info.epoch);
             let withdrawal_share = self.withdrawal_share.read(withdrawal_info.epoch);
+            let rate = self._withdrawal_exchange_rate_calc(withdrawal_pool, withdrawal_share);
+            let assets = ( rate * withdrawal_info.shares) / CONSTANTS::WAD;
+
             self.withdrawal_pool.write(withdrawal_info.epoch, withdrawal_pool - assets);
             self
                 .withdrawal_share
@@ -492,15 +497,16 @@ mod TokenManager {
             ref self: ContractState, l1_net_asset_value: u256, underlying_bridged_amount: u256
         ) -> StrategyReportL2 {
             self._assert_only_pooling_manager();
-
             let epoch = self.epoch.read();
+            let handled_epoch_withdrawal_len = self.handled_epoch_withdrawal_len.read();
+
+
             let prev_l1_net_asset_value = self.l1_net_asset_value.read();
             let prev_underlying_transit = self.underlying_transit.read();
-
             let sent_to_l1 = prev_l1_net_asset_value + prev_underlying_transit;
             let received_from_l1 = l1_net_asset_value + underlying_bridged_amount;
 
-            let handled_epoch_withdrawal_len = self.handled_epoch_withdrawal_len.read();
+            
             let buffer_mem = self.buffer.read() + underlying_bridged_amount;
 
             let mut profit = 0;
@@ -704,6 +710,14 @@ mod TokenManager {
         fn _withdrawal_exchange_rate(self: @ContractState, epoch: u256) -> u256 {
             let withdrawal_pool = self.withdrawal_pool.read(epoch);
             let withdrawal_share = self.withdrawal_share.read(epoch);
+            self._withdrawal_exchange_rate_calc(withdrawal_pool, withdrawal_share)
+        }
+
+        /// @notice Calculates the withdrawal exchange rate
+        /// @param withdrawal_pool the amount of assets in the withdrawal pool for an epoch
+        /// @param withdrawal_share the amount of shares in the withdrawal pool for an epoch
+        /// @return The withdrawal exchange rate
+        fn _withdrawal_exchange_rate_calc(self: @ContractState, withdrawal_pool: u256, withdrawal_share: u256) -> u256 {
             ((withdrawal_pool + 1) * CONSTANTS::WAD) / (withdrawal_share + 1)
         }
 
@@ -767,5 +781,6 @@ mod TokenManager {
                 token_disp.mint(fees_recipient, shares_to_mint);
             }
         }
+
     }
 }
