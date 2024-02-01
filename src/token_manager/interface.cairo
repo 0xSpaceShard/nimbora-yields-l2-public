@@ -77,6 +77,6 @@ trait ITokenManager<TContractState> {
     fn claim_withdrawal(ref self: TContractState, id: u256);
 
     fn handle_report(
-        ref self: TContractState, l1_net_asset_value: u256, underlying_bridged_amount: u256
+        ref self: TContractState, new_l1_net_asset_value: u256, underlying_bridged_amount: u256
     ) -> StrategyReportL2;
 }
