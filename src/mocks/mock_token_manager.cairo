@@ -493,7 +493,7 @@ mod MockTokenManager {
         /// @param underlying_bridged_amount The amount of underlying asset bridged
         /// @return StrategyReportL2 object containing the strategy report data
         fn handle_report(
-            ref self: ContractState, l1_net_asset_value: u256, underlying_bridged_amount: u256
+            ref self: ContractState, new_l1_net_asset_value: u256, underlying_bridged_amount: u256
         ) -> StrategyReportL2 {
             self._assert_only_pooling_manager();
 
@@ -502,7 +502,7 @@ mod MockTokenManager {
             let prev_underlying_transit = self.underlying_transit.read();
 
             let sent_to_l1 = prev_l1_net_asset_value + prev_underlying_transit;
-            let received_from_l1 = l1_net_asset_value + underlying_bridged_amount;
+            let received_from_l1 = new_l1_net_asset_value + underlying_bridged_amount;
 
             let handled_epoch_withdrawal_len = self.handled_epoch_withdrawal_len.read();
             let buffer_mem = self.buffer.read() + underlying_bridged_amount;
@@ -511,7 +511,7 @@ mod MockTokenManager {
 
             if (received_from_l1 < sent_to_l1) {
                 let underlying_loss = sent_to_l1 - received_from_l1;
-                let total_underlying = buffer_mem + l1_net_asset_value;
+                let total_underlying = buffer_mem + new_l1_net_asset_value;
                 let total_underlying_due = self
                     ._total_underlying_due(handled_epoch_withdrawal_len, epoch);
                 let amount_to_consider = total_underlying + total_underlying_due;
@@ -562,7 +562,7 @@ mod MockTokenManager {
 
             let new_epoch = epoch + 1;
             self.epoch.write(new_epoch);
-            self.l1_net_asset_value.write(l1_net_asset_value);
+            self.l1_net_asset_value.write(new_l1_net_asset_value);
 
             let token = self.token.read();
             let token_disp = ERC20ABIDispatcher { contract_address: token };
@@ -588,7 +588,7 @@ mod MockTokenManager {
                 }
             } else {
                 let dust_limit_factor = self.dust_limit.read();
-                let dust_limit = (l1_net_asset_value * dust_limit_factor) / CONSTANTS::WAD;
+                let dust_limit = (new_l1_net_asset_value * dust_limit_factor) / CONSTANTS::WAD;
 
                 if (dust_limit > remaining_buffer_mem) {
                     // We are fine
