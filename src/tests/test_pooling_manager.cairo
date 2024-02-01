@@ -758,6 +758,69 @@ mod testPoolingManager {
     }
 
     #[test]
+    fn hash_l1_data() {
+        let (
+            token_manager, 
+            token_address, 
+            pooling_manager, 
+            _
+        ) = deposit_and_handle_mass(Option::None);
+
+        let strategy_report_l1 = StrategyReportL1 {
+            l1_strategy: 2.try_into().unwrap(),
+            l1_net_asset_value: 200000000000000000,
+            underlying_bridged_amount: 0,
+            processed: true,
+        };
+
+        let hash_data = pooling_manager.hash_l1_data(array![strategy_report_l1].span());
+
+        assert(hash_data != 0, 'Wrong hash data');
+    }
+
+    #[test]
+    fn hash_l1_data_empty_strategy() {
+        let (
+            token_manager, 
+            token_address, 
+            pooling_manager, 
+            _
+        ) = deposit_and_handle_mass(Option::None);
+
+        let hash_data = pooling_manager.hash_l1_data(array![].span());
+        assert(hash_data != 0, 'Wrong hash data');
+    }
+
+    #[test]
+    fn hash_l1_data_collision() {
+        let (
+            token_manager, 
+            token_address, 
+            pooling_manager, 
+            _
+        ) = deposit_and_handle_mass(Option::None);
+
+        let strategy_report_l1_1 = StrategyReportL1 {
+            l1_strategy: 2.try_into().unwrap(),
+            l1_net_asset_value: 2000000000000000001,
+            underlying_bridged_amount: 0,
+            processed: true,
+        };
+
+        let strategy_report_l1_2 = StrategyReportL1 {
+            l1_strategy: 2.try_into().unwrap(),
+            l1_net_asset_value: 200000000000000000,
+            underlying_bridged_amount: 10,
+            processed: true,
+        };
+
+        let hash_data_1 = pooling_manager.hash_l1_data(array![strategy_report_l1_1].span());
+        let hash_data_2 = pooling_manager.hash_l1_data(array![strategy_report_l1_2].span());
+
+        assert(hash_data_1 != hash_data_2, 'Hash data collision');
+    }
+
+    #[test]
     fn upgrade_pooling_manager() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
