@@ -2,7 +2,7 @@ mod CONSTANTS {
     const WAD: u256 = 1_000_000_000_000_000_000; // 1e18
     const DEPOSIT: u256 = 0;
     const REPORT: u256 = 1;
-    const WITHDRAW: u256 = 2;
+    const WITHDRAWAL: u256 = 2;
 }
 
 mod MATH {
