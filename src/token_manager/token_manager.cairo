@@ -487,144 +487,35 @@ mod TokenManager {
             pooling_manager_disp.emit_claim_withdrawal_event(l1_strategy, caller, id, assets);
         }
 
-
         /// @notice Handles the report from the L1 strategy
         /// @dev Only callable by the pooling manager, processes the report and updates the contract state
-        /// @param l1_net_asset_value The net asset value reported from L1
+        /// @param new_l1_net_asset_value The net asset value reported from L1
         /// @param underlying_bridged_amount The amount of underlying asset bridged
         /// @return StrategyReportL2 object containing the strategy report data
         fn handle_report(
-            ref self: ContractState, l1_net_asset_value: u256, underlying_bridged_amount: u256
+            ref self: ContractState, new_l1_net_asset_value: u256, underlying_bridged_amount: u256
         ) -> StrategyReportL2 {
             self._assert_only_pooling_manager();
             let epoch = self.epoch.read();
             let handled_epoch_withdrawal_len = self.handled_epoch_withdrawal_len.read();
-
-
-            let prev_l1_net_asset_value = self.l1_net_asset_value.read();
-            let prev_underlying_transit = self.underlying_transit.read();
-            let sent_to_l1 = prev_l1_net_asset_value + prev_underlying_transit;
-            let received_from_l1 = l1_net_asset_value + underlying_bridged_amount;
-
-            
-            let buffer_mem = self.buffer.read() + underlying_bridged_amount;
-
-            let mut profit = 0;
-
-            if (received_from_l1 < sent_to_l1) {
-                let underlying_loss = sent_to_l1 - received_from_l1;
-                let total_underlying = buffer_mem + l1_net_asset_value;
-                let total_underlying_due = self
-                    ._total_underlying_due(handled_epoch_withdrawal_len, epoch);
-                let amount_to_consider = total_underlying + total_underlying_due;
-                let mut i = handled_epoch_withdrawal_len;
-                loop {
-                    if (i > epoch) {
-                        break ();
-                    }
-                    let withdrawal_pool = self.withdrawal_pool.read(i);
-                    let withdrawal_epoch_loss_incured = (underlying_loss * withdrawal_pool)
-                        / amount_to_consider;
-                    self.withdrawal_pool.write(i, withdrawal_pool - withdrawal_epoch_loss_incured);
-                    i += 1;
-                }
-            } else {
-                // Share price increase, performance_fee is taken
-                profit = received_from_l1 - sent_to_l1;
-            }
-
-            let mut remaining_buffer_mem = buffer_mem;
-            let mut cumulatif_due_underlying = 0;
+            let buffer = self.buffer.read();
+            let profit = self._calculate_profit_and_handle_loss(epoch, handled_epoch_withdrawal_len, new_l1_net_asset_value + underlying_bridged_amount, buffer);
             let withdrawal_epoch_delay = self.withdrawal_epoch_delay.read();
-
-            if (epoch >= withdrawal_epoch_delay) {
-                let mut new_handled_epoch_withdrawal_len = handled_epoch_withdrawal_len;
-                let mut j = handled_epoch_withdrawal_len;
-                let limit_epoch = epoch - withdrawal_epoch_delay;
-                loop {
-                    if (j > limit_epoch) {
-                        break ();
-                    }
-
-                    let withdrawal_pool = self.withdrawal_pool.read(j);
-
-                    if (remaining_buffer_mem >= withdrawal_pool) {
-                        remaining_buffer_mem -= withdrawal_pool;
-                        new_handled_epoch_withdrawal_len += 1;
-                    } else {
-                        cumulatif_due_underlying += withdrawal_pool - remaining_buffer_mem;
-                    }
-
-                    j += 1;
-                };
-                if (new_handled_epoch_withdrawal_len > handled_epoch_withdrawal_len) {
-                    self.handled_epoch_withdrawal_len.write(new_handled_epoch_withdrawal_len);
-                }
-            }
-
-            let new_epoch = epoch + 1;
-            self.epoch.write(new_epoch);
-            self.l1_net_asset_value.write(l1_net_asset_value);
-
+            let (remaining_assets, needed_assets) = self._handle_withdrawals(epoch, handled_epoch_withdrawal_len, withdrawal_epoch_delay, underlying_bridged_amount, buffer);
+            let (action_id, amount) = self._handle_result(remaining_assets, needed_assets, new_l1_net_asset_value);
+            self.epoch.write(epoch + 1);
+            self.l1_net_asset_value.write(new_l1_net_asset_value);
             let token = self.token.read();
+            self._check_profit_and_mint(profit, token);
             let token_disp = ERC20ABIDispatcher { contract_address: token };
             let decimals = token_disp.decimals();
-            let l1_strategy = self.l1_strategy.read();
             let one_share_unit = MATH::pow(10, decimals.into());
-
-            if (cumulatif_due_underlying > 0) {
-                // We need more underlying from L1
-                let underlying_request_amount = cumulatif_due_underlying - remaining_buffer_mem;
-                self.buffer.write(remaining_buffer_mem);
-                self.underlying_transit.write(0);
-
-                self._check_profit_and_mint(profit, token);
-
-                let new_share_price = self._convert_to_assets(one_share_unit);
-
-                StrategyReportL2 {
-                    l1_strategy: l1_strategy,
-                    action_id: 2,
-                    amount: underlying_request_amount,
-                    new_share_price: new_share_price
-                }
-            } else {
-                let dust_limit_factor = self.dust_limit.read();
-                let dust_limit = (l1_net_asset_value * dust_limit_factor) / CONSTANTS::WAD;
-
-                if (dust_limit > remaining_buffer_mem) {
-                    // We are fine
-                    self.buffer.write(remaining_buffer_mem);
-                    self.underlying_transit.write(0);
-
-                    self._check_profit_and_mint(profit, token);
-
-                    let new_share_price = self._convert_to_assets(one_share_unit);
-
-                    StrategyReportL2 {
-                        l1_strategy: l1_strategy,
-                        action_id: 1,
-                        amount: 0,
-                        new_share_price: new_share_price
-                    }
-                } else {
-                    // We deposit underlying to L1
-                    self.buffer.write(0);
-                    self.underlying_transit.write(remaining_buffer_mem);
-                    self._check_profit_and_mint(profit, token);
-                    let underlying_disp = ERC20ABIDispatcher {
-                        contract_address: self.underlying.read()
-                    };
-                    underlying_disp.transfer(self.pooling_manager.read(), remaining_buffer_mem);
-                    let new_share_price = self._convert_to_assets(one_share_unit);
-
-                    StrategyReportL2 {
-                        l1_strategy: l1_strategy,
-                        action_id: 0,
-                        amount: remaining_buffer_mem,
-                        new_share_price: new_share_price
-                    }
-                }
+            let new_share_price = self._convert_to_assets(one_share_unit);
+            StrategyReportL2 {
+                l1_strategy: self.l1_strategy.read(),
+                action_id: action_id,
+                amount: amount,
+                new_share_price: new_share_price
             }
         }
     }
@@ -767,6 +658,109 @@ mod TokenManager {
             self.dust_limit.write(new_dust_limit);
         }
 
+        /// @notice Calculates profit or loss and handles loss if incurred.
+        /// @param epoch The current epoch.
+        /// @param handled_epoch_withdrawal_len The length of handled epoch withdrawals.
+        /// @param new_l1_net_asset_value The new L1 net asset value.
+        /// @param underlying_bridged_amount The amount of underlying asset bridged.
+        /// @param buffer The buffer amount.
+        /// @return profit The calculated profit or zero in case of a loss.
+        fn _calculate_profit_and_handle_loss(ref self: ContractState, epoch: u256, handled_epoch_withdrawal_len: u256, received_from_l1: u256, buffer: u256) -> u256{
+            let sent_to_l1 = self.l1_net_asset_value.read() + self.underlying_transit.read();
+            if(received_from_l1 < sent_to_l1){
+                let loss = sent_to_l1 - received_from_l1;
+                let amount_to_consider = buffer + sent_to_l1;
+                let mut i = handled_epoch_withdrawal_len;
+                loop {
+                    if (i > epoch) {
+                        break ();
+                    }
+                    let withdrawal_pool = self.withdrawal_pool.read(i);
+                    let withdrawal_epoch_loss_incured = (loss * withdrawal_pool)
+                        / amount_to_consider;
+                    self.withdrawal_pool.write(i, withdrawal_pool - withdrawal_epoch_loss_incured);
+                    i += 1;
+                };
+                0
+            } else {
+                received_from_l1 - sent_to_l1
+            }
+        }
+
+        /// @notice Handles withdrawals for a given epoch.
+        /// @dev Calculates the remaining and needed assets after processing withdrawals.
+        /// @param epoch The current epoch for which withdrawals are being processed.
+        /// @param handled_epoch_withdrawal_len The length of withdrawals already handled in the current epoch.
+        /// @param withdrawal_epoch_delay The delay after which withdrawals can be processed.
+        /// @param underlying_bridged_amount The amount of underlying assets bridged to the contract.
+        /// @param buffer The buffer amount in the contract.
+        /// @return A tuple containing the remaining assets after withdrawals and the additional assets needed.
+        fn _handle_withdrawals(ref self: ContractState, epoch: u256, handled_epoch_withdrawal_len: u256, withdrawal_epoch_delay: u256, underlying_bridged_amount: u256, buffer: u256) -> (u256, u256) {
+            let mut remaining_assets = underlying_bridged_amount + buffer;
+            let mut needed_assets = 0;
+
+            if (epoch >= withdrawal_epoch_delay) {
+                let mut new_handled_epoch_withdrawal_len = handled_epoch_withdrawal_len;
+                let mut j = handled_epoch_withdrawal_len;
+                let limit_epoch = epoch - withdrawal_epoch_delay;
+                loop {
+                    if (j > limit_epoch) {
+                        break ();
+                    }
+
+                    let withdrawal_pool = self.withdrawal_pool.read(j);
+
+                    if (remaining_assets >= withdrawal_pool) {
+                        remaining_assets -= withdrawal_pool;
+                        new_handled_epoch_withdrawal_len += 1;
+                    } else {
+                        needed_assets += withdrawal_pool - remaining_assets;
+                    }
+
+                    j += 1;
+                };
+                if (new_handled_epoch_withdrawal_len > handled_epoch_withdrawal_len) {
+                    self.handled_epoch_withdrawal_len.write(new_handled_epoch_withdrawal_len);
+                }
+            }
+            (remaining_assets, needed_assets)
+        }
+
+
+        /// @notice Handles the result of withdrawal and deposit operations.
+        /// @dev Updates the contract state based on the remaining and needed assets, and performs necessary transfers.
+        /// @param remaining_assets The remaining assets after processing withdrawals.
+        /// @param needed_assets The additional assets needed to fulfill all withdrawals.
+        /// @param new_l1_net_asset_value The new net asset value on L1.
+        /// @return A tuple indicating the operation type (withdrawal or deposit) and the amount involved.
+        fn _handle_result(ref self: ContractState, remaining_assets: u256, needed_assets: u256, new_l1_net_asset_value: u256) -> (u256, u256) {
+            if (needed_assets > 0) {
+                self.buffer.write(remaining_assets);
+                self.underlying_transit.write(0);
+                (CONSTANTS::WITHDRAWAL, needed_assets)
+            } else {
+                let dust_limit_factor = self.dust_limit.read();
+                let dust_limit = (new_l1_net_asset_value * dust_limit_factor) / CONSTANTS::WAD;
+                if (dust_limit > remaining_assets) {
+                    self.buffer.write(remaining_assets);
+                    self.underlying_transit.write(0);
+                    (CONSTANTS::REPORT, 0)
+                } else {
+                    self.buffer.write(0);
+                    self.underlying_transit.write(remaining_assets);
+                    let underlying_disp = ERC20ABIDispatcher {
+                        contract_address: self.underlying.read()
+                    };
+                    underlying_disp.transfer(self.pooling_manager.read(), remaining_assets);
+                    (CONSTANTS::DEPOSIT, remaining_assets)
+                }
+            }
+        }
+
+        /// @notice Checks the profit made and mints new tokens as performance fees.
+        /// @dev Mints new tokens proportional to the profit made and the performance fees.
+        /// @param profit The profit made in the current epoch.
+        /// @param token The address of the token contract to mint new tokens.
         fn _check_profit_and_mint(ref self: ContractState, profit: u256, token: ContractAddress) {
             if (profit > 0) {
                 let performance_fees = self.performance_fees.read();
