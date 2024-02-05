@@ -1,1 +1,4 @@
+.env
 target
+node_modules
+nimbora_keystore
