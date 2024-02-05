@@ -110,8 +110,24 @@ mod Factory {
 
         /// @notice Reads the pooling manager contract address
         /// @return The address of the pooling manager
-        fn pooling_manager_address(self: @ContractState) -> ContractAddress {
+        fn pooling_manager(self: @ContractState) -> ContractAddress {
             self.pooling_manager.read()
+        }
+
+        /// @notice Computes the salts for token manager and token based on strategy parameters
+        /// @param l1_strategy The Ethereum address of the L1 strategy
+        /// @param underlying The contract address of the underlying asset
+        /// @param token_name The name of the token
+        /// @param token_symbol The symbol of the token
+        /// @return A tuple containing the salts for the token manager and token
+        fn compute_salt_for_strategy(
+            self: @ContractState,
+            l1_strategy: EthAddress,
+            underlying: ContractAddress,
+            token_name: felt252,
+            token_symbol: felt252
+        ) -> (felt252, felt252) {
+            self._compute_salt_for_strategy(l1_strategy, underlying, token_name, token_symbol)
         }
 
         /// @notice Deploys a new strategy with specified parameters
@@ -235,6 +251,7 @@ mod Factory {
             };
             pooling_manager_disp.emit_token_class_hash_updated_event(new_token_class_hash);
         }
+
     }
 
 
