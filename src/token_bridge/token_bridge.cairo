@@ -2,19 +2,16 @@ use starknet::ContractAddress;
 
 #[starknet::contract]
 mod TokenBridge {
-    use super::{ContractAddress};
-    use starknet::{
-        get_caller_address, contract_address::{Felt252TryIntoContractAddress},
-        syscalls::send_message_to_l1_syscall, Zeroable, ClassHash
-    };
-    use openzeppelin::{
-        token::erc20::interface::{IERC20CamelDispatcher, IERC20CamelDispatcherTrait}
-    };
-    use openzeppelin::upgrades::UpgradeableComponent;
-
     use nimbora_yields::token_bridge::interface::{
         ITokenBridge, IMintableTokenDispatcher, IMintableTokenDispatcherTrait
     };
+    use openzeppelin::upgrades::UpgradeableComponent;
+    use openzeppelin::{token::erc20::interface::{IERC20CamelDispatcher, IERC20CamelDispatcherTrait}};
+    use starknet::{
+        get_caller_address, contract_address::{Felt252TryIntoContractAddress}, syscalls::send_message_to_l1_syscall,
+        Zeroable, ClassHash
+    };
+    use super::{ContractAddress};
 
     const ZERO_ADDRESS: felt252 = 'ZERO_ADDRESS';
     const ZERO_AMOUNT: felt252 = 'ZERO_AMOUNT';
@@ -110,16 +107,14 @@ mod TokenBridge {
             // Call burn on l2_token contract and verify success.
 
             let caller_address = get_caller_address();
-            let balance_before = IERC20CamelDispatcher { contract_address: l2_token }
-                .balanceOf(caller_address);
+            let balance_before = IERC20CamelDispatcher { contract_address: l2_token }.balanceOf(caller_address);
 
             assert(amount <= balance_before, INSUFFICIENT_FUNDS);
 
             let mintable_token = IMintableTokenDispatcher { contract_address: l2_token };
             mintable_token.permissionedBurn(caller_address, amount);
 
-            let balance_after = IERC20CamelDispatcher { contract_address: l2_token }
-                .balanceOf(caller_address);
+            let balance_after = IERC20CamelDispatcher { contract_address: l2_token }.balanceOf(caller_address);
 
             assert(balance_after == balance_before - amount, INCORRECT_BALANCE);
 
@@ -133,11 +128,7 @@ mod TokenBridge {
             self
                 .emit(
                     Event::WithdrawInitiated(
-                        WithdrawInitiated {
-                            l1_recipient: l1_recipient,
-                            amount: amount,
-                            caller_address: caller_address
-                        }
+                        WithdrawInitiated { l1_recipient: l1_recipient, amount: amount, caller_address: caller_address }
                     )
                 );
         }
@@ -165,9 +156,7 @@ mod TokenBridge {
         /// @param amount The amount being deposited.
         /// @dev Ensures the validity of account, L1 bridge, and L2 token addresses before proceeding.
         /// Checks that the deposit was initiated by the L1 bridge, mints L2 tokens, and verifies the updated balance.
-        fn handle_deposit(
-            ref self: ContractState, from_address: felt252, account: felt252, amount: u256
-        ) {
+        fn handle_deposit(ref self: ContractState, from_address: felt252, account: felt252, amount: u256) {
             // Check account address is valid.
             assert(account.is_non_zero(), ZERO_ADDRESS);
 

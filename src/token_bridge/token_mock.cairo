@@ -1,9 +1,9 @@
 #[starknet::contract]
 mod TokenMock {
+    use nimbora_yields::token_bridge::interface::{IMintableToken};
     use openzeppelin::token::erc20::ERC20Component;
     use openzeppelin::upgrades::UpgradeableComponent;
     use starknet::{ContractAddress, ClassHash};
-    use nimbora_yields::token_bridge::interface::{IMintableToken};
 
     component!(path: ERC20Component, storage: erc20, event: ERC20Event);
     component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);

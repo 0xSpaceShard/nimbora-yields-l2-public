@@ -1,26 +1,21 @@
 #[starknet::contract]
 mod TokenManager {
-    use starknet::{
-        ContractAddress, get_caller_address, get_contract_address, eth_address::EthAddress,
-        Zeroable, ClassHash
-    };
+    use nimbora_yields::pooling_manager::interface::{IPoolingManagerDispatcher, IPoolingManagerDispatcherTrait};
+    use nimbora_yields::token::interface::{ITokenDispatcher, ITokenDispatcherTrait};
+
+
+    use nimbora_yields::token_manager::interface::{ITokenManager, WithdrawalInfo, StrategyReportL2};
+
+    use nimbora_yields::utils::{CONSTANTS, MATH};
+    use openzeppelin::access::accesscontrol::interface::{IAccessControlDispatcher, IAccessControlDispatcherTrait};
 
 
     use openzeppelin::token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
     use openzeppelin::token::erc721::interface::{ERC721ABIDispatcher, ERC721ABIDispatcherTrait};
-    use openzeppelin::access::accesscontrol::interface::{
-        IAccessControlDispatcher, IAccessControlDispatcherTrait
-    };
     use openzeppelin::upgrades::UpgradeableComponent;
-
-
-    use nimbora_yields::token_manager::interface::{ITokenManager, WithdrawalInfo, StrategyReportL2};
-    use nimbora_yields::token::interface::{ITokenDispatcher, ITokenDispatcherTrait};
-    use nimbora_yields::pooling_manager::interface::{
-        IPoolingManagerDispatcher, IPoolingManagerDispatcherTrait
+    use starknet::{
+        ContractAddress, get_caller_address, get_contract_address, eth_address::EthAddress, Zeroable, ClassHash
     };
-
-    use nimbora_yields::utils::{CONSTANTS, MATH};
 
     // Components
     component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
@@ -67,12 +62,12 @@ mod TokenManager {
         const ZERO_AMOUNT: felt252 = 'Amount nul';
         const ZERO_ADDRESS: felt252 = 'Address is zero';
         const INVALID_LIMIT: felt252 = 'Invalid limit';
-        const LOW_LIMIT: felt252 = 'Low limit reacher';
-        const HIGH_LIMIT: felt252 = 'High limit reacher';
+        const LOW_LIMIT: felt252 = 'Low limit reached';
+        const HIGH_LIMIT: felt252 = 'High limit reached';
         const NOT_OWNER: felt252 = 'Not owner';
         const WITHDRAWAL_NOT_REDY: felt252 = 'Withdrawal not ready';
         const ALREADY_CLAIMED: felt252 = 'Already claimed';
-        const ZERO_SHARES: felt252 = 'Shares is zero';
+        const INVALID_ID: felt252 = 'Invalid Id';
     }
 
     #[constructor]
@@ -205,9 +200,7 @@ mod TokenManager {
         /// @param user The address of the user
         /// @param id The unique identifier of the withdrawal
         /// @return Withdrawal information corresponding to the user and ID
-        fn withdrawal_info(
-            self: @ContractState, user: ContractAddress, id: u256
-        ) -> WithdrawalInfo {
+        fn withdrawal_info(self: @ContractState, user: ContractAddress, id: u256) -> WithdrawalInfo {
             self.withdrawal_info.read((user, id))
         }
 
@@ -275,31 +268,22 @@ mod TokenManager {
             self._set_performance_fees(new_performance_fees);
             let l1_strategy = self.l1_strategy.read();
             let pooling_manager = self.pooling_manager.read();
-            let pooling_manager_disp = IPoolingManagerDispatcher {
-                contract_address: pooling_manager
-            };
-            pooling_manager_disp
-                .emit_performance_fees_updated_event(l1_strategy, new_performance_fees);
+            let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
+            pooling_manager_disp.emit_performance_fees_updated_event(l1_strategy, new_performance_fees);
         }
 
         /// @notice Sets new deposit limits
         /// @dev Only callable by the owner of the contract
         /// @param new_deposit_limit_low The new lower limit for deposits
         /// @param new_deposit_limit_high The new upper limit for deposits
-        fn set_deposit_limit(
-            ref self: ContractState, new_deposit_limit_low: u256, new_deposit_limit_high: u256
-        ) {
+        fn set_deposit_limit(ref self: ContractState, new_deposit_limit_low: u256, new_deposit_limit_high: u256) {
             self._assert_only_owner();
             self._set_deposit_limit(new_deposit_limit_low, new_deposit_limit_high);
             let l1_strategy = self.l1_strategy.read();
             let pooling_manager = self.pooling_manager.read();
-            let pooling_manager_disp = IPoolingManagerDispatcher {
-                contract_address: pooling_manager
-            };
+            let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
             pooling_manager_disp
-                .emit_deposit_limit_updated_event(
-                    l1_strategy, new_deposit_limit_low, new_deposit_limit_high
-                );
+                .emit_deposit_limit_updated_event(l1_strategy, new_deposit_limit_low, new_deposit_limit_high);
         }
 
         /// @notice Sets new withdrawal limits
@@ -313,13 +297,9 @@ mod TokenManager {
             self._set_withdrawal_limit(new_withdrawal_limit_low, new_withdrawal_limit_high);
             let l1_strategy = self.l1_strategy.read();
             let pooling_manager = self.pooling_manager.read();
-            let pooling_manager_disp = IPoolingManagerDispatcher {
-                contract_address: pooling_manager
-            };
+            let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
             pooling_manager_disp
-                .emit_withdrawal_limit_updated_event(
-                    l1_strategy, new_withdrawal_limit_low, new_withdrawal_limit_high
-                );
+                .emit_withdrawal_limit_updated_event(l1_strategy, new_withdrawal_limit_low, new_withdrawal_limit_high);
         }
 
         /// @notice Sets a new withdrawal epoch delay
@@ -330,11 +310,8 @@ mod TokenManager {
             self._set_withdrawal_epoch_delay(new_withdrawal_epoch_delay);
             let l1_strategy = self.l1_strategy.read();
             let pooling_manager = self.pooling_manager.read();
-            let pooling_manager_disp = IPoolingManagerDispatcher {
-                contract_address: pooling_manager
-            };
-            pooling_manager_disp
-                .emit_withdrawal_epoch_delay_updated_event(l1_strategy, new_withdrawal_epoch_delay);
+            let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
+            pooling_manager_disp.emit_withdrawal_epoch_delay_updated_event(l1_strategy, new_withdrawal_epoch_delay);
         }
 
         /// @notice Sets a new dust limit
@@ -345,9 +322,7 @@ mod TokenManager {
             self._set_dust_limit(new_dust_limit);
             let l1_strategy = self.l1_strategy.read();
             let pooling_manager = self.pooling_manager.read();
-            let pooling_manager_disp = IPoolingManagerDispatcher {
-                contract_address: pooling_manager
-            };
+            let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
             pooling_manager_disp.emit_dust_limit_updated_event(l1_strategy, new_dust_limit);
         }
 
@@ -357,12 +332,7 @@ mod TokenManager {
         /// @param assets The amount of assets to deposit
         /// @param receiver The address to receive the minted shares
         /// @param referal The referral address for the deposit
-        fn deposit(
-            ref self: ContractState,
-            assets: u256,
-            receiver: ContractAddress,
-            referal: ContractAddress
-        ) {
+        fn deposit(ref self: ContractState, assets: u256, receiver: ContractAddress, referal: ContractAddress) {
             let deposit_limit_low = self.deposit_limit_low.read();
             let deposit_limit_high = self.deposit_limit_high.read();
 
@@ -387,11 +357,8 @@ mod TokenManager {
 
             let l1_strategy = self.l1_strategy.read();
             let pooling_manager = self.pooling_manager.read();
-            let pooling_manager_disp = IPoolingManagerDispatcher {
-                contract_address: pooling_manager
-            };
-            pooling_manager_disp
-                .emit_deposit_event(l1_strategy, caller, receiver, assets, shares, referal);
+            let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
+            pooling_manager_disp.emit_deposit_event(l1_strategy, caller, receiver, assets, shares, referal);
         }
 
         /// @notice Allows a user to request a withdrawal from the contract
@@ -410,31 +377,27 @@ mod TokenManager {
             let epoch = self.epoch.read();
             let assets = self._convert_to_assets(shares);
             token_disp.burn(caller, shares);
-            let withdrawal_pool_share = (assets * CONSTANTS::WAD)
-                / self._withdrawal_exchange_rate(epoch);
 
             let withdrawal_pool = self.withdrawal_pool.read(epoch);
             let withdrawal_share = self.withdrawal_share.read(epoch);
+
+            let withdrawal_pool_share = (assets * CONSTANTS::WAD)
+                / self._withdrawal_exchange_rate_calc(withdrawal_pool, withdrawal_share);
+
             self.withdrawal_pool.write(epoch, withdrawal_pool + assets);
             self.withdrawal_share.write(epoch, withdrawal_share + withdrawal_pool_share);
 
             let user_withdrawal_len = self.user_withdrawal_len.read(caller);
             self
                 .withdrawal_info
-                .write(
-                    (caller, user_withdrawal_len),
-                    WithdrawalInfo { shares: shares, epoch: epoch, claimed: false }
-                );
+                .write((caller, user_withdrawal_len), WithdrawalInfo { shares: shares, epoch: epoch, claimed: false });
+            self.user_withdrawal_len.write(caller, user_withdrawal_len + 1);
 
             let l1_strategy = self.l1_strategy.read();
             let pooling_manager = self.pooling_manager.read();
-            let pooling_manager_disp = IPoolingManagerDispatcher {
-                contract_address: pooling_manager
-            };
+            let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
             pooling_manager_disp
-                .emit_request_withdrawal_event(
-                    l1_strategy, caller, assets, shares, user_withdrawal_len, epoch
-                );
+                .emit_request_withdrawal_event(l1_strategy, caller, assets, shares, user_withdrawal_len, epoch);
         }
 
 
@@ -443,32 +406,27 @@ mod TokenManager {
         /// @param id The unique identifier of the withdrawal request
         fn claim_withdrawal(ref self: ContractState, id: u256) {
             let caller = get_caller_address();
+            let user_withdrawal_len = self.user_withdrawal_len(caller);
+            assert(user_withdrawal_len > id, Errors::INVALID_ID);
             let withdrawal_info = self.withdrawal_info.read((caller, id));
-            assert(withdrawal_info.shares.is_non_zero(), Errors::ZERO_SHARES);
             assert(!withdrawal_info.claimed, Errors::ALREADY_CLAIMED);
             let handled_epoch_withdrawal_len = self.handled_epoch_withdrawal_len.read();
-            assert(
-                handled_epoch_withdrawal_len > withdrawal_info.epoch, Errors::WITHDRAWAL_NOT_REDY
-            );
+            assert(handled_epoch_withdrawal_len > withdrawal_info.epoch, Errors::WITHDRAWAL_NOT_REDY);
 
             self
                 .withdrawal_info
                 .write(
                     (caller, id),
-                    WithdrawalInfo {
-                        shares: withdrawal_info.shares, epoch: withdrawal_info.epoch, claimed: true
-                    }
+                    WithdrawalInfo { shares: withdrawal_info.shares, epoch: withdrawal_info.epoch, claimed: true }
                 );
-
-            let withdrawal_exchange_rate = self._withdrawal_exchange_rate(withdrawal_info.epoch);
-            let assets = (withdrawal_exchange_rate * withdrawal_info.shares) / CONSTANTS::WAD;
 
             let withdrawal_pool = self.withdrawal_pool.read(withdrawal_info.epoch);
             let withdrawal_share = self.withdrawal_share.read(withdrawal_info.epoch);
+            let rate = self._withdrawal_exchange_rate_calc(withdrawal_pool, withdrawal_share);
+            let assets = (rate * withdrawal_info.shares) / CONSTANTS::WAD;
+
             self.withdrawal_pool.write(withdrawal_info.epoch, withdrawal_pool - assets);
-            self
-                .withdrawal_share
-                .write(withdrawal_info.epoch, withdrawal_share - withdrawal_info.shares);
+            self.withdrawal_share.write(withdrawal_info.epoch, withdrawal_share - withdrawal_info.shares);
 
             let underlying = self.underlying.read();
             let underlying_disp = ERC20ABIDispatcher { contract_address: underlying };
@@ -476,150 +434,45 @@ mod TokenManager {
 
             let l1_strategy = self.l1_strategy.read();
             let pooling_manager = self.pooling_manager.read();
-            let pooling_manager_disp = IPoolingManagerDispatcher {
-                contract_address: pooling_manager
-            };
+            let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
             pooling_manager_disp.emit_claim_withdrawal_event(l1_strategy, caller, id, assets);
         }
 
-
         /// @notice Handles the report from the L1 strategy
         /// @dev Only callable by the pooling manager, processes the report and updates the contract state
-        /// @param l1_net_asset_value The net asset value reported from L1
+        /// @param new_l1_net_asset_value The net asset value reported from L1
         /// @param underlying_bridged_amount The amount of underlying asset bridged
         /// @return StrategyReportL2 object containing the strategy report data
         fn handle_report(
-            ref self: ContractState, l1_net_asset_value: u256, underlying_bridged_amount: u256
+            ref self: ContractState, new_l1_net_asset_value: u256, underlying_bridged_amount: u256
         ) -> StrategyReportL2 {
             self._assert_only_pooling_manager();
-
             let epoch = self.epoch.read();
-            let prev_l1_net_asset_value = self.l1_net_asset_value.read();
-            let prev_underlying_transit = self.underlying_transit.read();
-
-            let sent_to_l1 = prev_l1_net_asset_value + prev_underlying_transit;
-            let received_from_l1 = l1_net_asset_value + underlying_bridged_amount;
-
             let handled_epoch_withdrawal_len = self.handled_epoch_withdrawal_len.read();
-            let buffer_mem = self.buffer.read() + underlying_bridged_amount;
-
-            let mut profit = 0;
-
-            if (received_from_l1 < sent_to_l1) {
-                let underlying_loss = sent_to_l1 - received_from_l1;
-                let total_underlying = buffer_mem + l1_net_asset_value;
-                let total_underlying_due = self
-                    ._total_underlying_due(handled_epoch_withdrawal_len, epoch);
-                let amount_to_consider = total_underlying + total_underlying_due;
-                let mut i = handled_epoch_withdrawal_len;
-                loop {
-                    if (i > epoch) {
-                        break ();
-                    }
-                    let withdrawal_pool = self.withdrawal_pool.read(i);
-                    let withdrawal_epoch_loss_incured = (underlying_loss * withdrawal_pool)
-                        / amount_to_consider;
-                    self.withdrawal_pool.write(i, withdrawal_pool - withdrawal_epoch_loss_incured);
-                    i += 1;
-                }
-            } else {
-                // Share price increase, performance_fee is taken
-                profit = received_from_l1 - sent_to_l1;
-            }
-
-            let mut remaining_buffer_mem = buffer_mem;
-            let mut cumulatif_due_underlying = 0;
+            let buffer = self.buffer.read();
+            let profit = self
+                ._calculate_profit_and_handle_loss(
+                    epoch, handled_epoch_withdrawal_len, new_l1_net_asset_value + underlying_bridged_amount, buffer
+                );
             let withdrawal_epoch_delay = self.withdrawal_epoch_delay.read();
-
-            if (epoch >= withdrawal_epoch_delay) {
-                let mut new_handled_epoch_withdrawal_len = handled_epoch_withdrawal_len;
-                let mut j = handled_epoch_withdrawal_len;
-                let limit_epoch = epoch - withdrawal_epoch_delay;
-                loop {
-                    if (j > limit_epoch) {
-                        break ();
-                    }
-
-                    let withdrawal_pool = self.withdrawal_pool.read(j);
-
-                    if (remaining_buffer_mem >= withdrawal_pool) {
-                        remaining_buffer_mem -= withdrawal_pool;
-                        new_handled_epoch_withdrawal_len += 1;
-                    } else {
-                        cumulatif_due_underlying += withdrawal_pool - remaining_buffer_mem;
-                    }
-
-                    j += 1;
-                };
-                if (new_handled_epoch_withdrawal_len > handled_epoch_withdrawal_len) {
-                    self.handled_epoch_withdrawal_len.write(new_handled_epoch_withdrawal_len);
-                }
-            }
-
-            let new_epoch = epoch + 1;
-            self.epoch.write(new_epoch);
-            self.l1_net_asset_value.write(l1_net_asset_value);
-
+            let (remaining_assets, needed_assets) = self
+                ._handle_withdrawals(
+                    epoch, handled_epoch_withdrawal_len, withdrawal_epoch_delay, underlying_bridged_amount, buffer
+                );
+            let (action_id, amount) = self._handle_result(remaining_assets, needed_assets, new_l1_net_asset_value);
+            self.epoch.write(epoch + 1);
+            self.l1_net_asset_value.write(new_l1_net_asset_value);
             let token = self.token.read();
+            self._check_profit_and_mint(profit, token);
             let token_disp = ERC20ABIDispatcher { contract_address: token };
             let decimals = token_disp.decimals();
-            let l1_strategy = self.l1_strategy.read();
             let one_share_unit = MATH::pow(10, decimals.into());
-
-            if (cumulatif_due_underlying > 0) {
-                // We need more underlying from L1
-                let underlying_request_amount = cumulatif_due_underlying - remaining_buffer_mem;
-                self.buffer.write(remaining_buffer_mem);
-                self.underlying_transit.write(0);
-
-                self._check_profit_and_mint(profit, token);
-
-                let new_share_price = self._convert_to_assets(one_share_unit);
-
-                StrategyReportL2 {
-                    l1_strategy: l1_strategy,
-                    action_id: 2,
-                    amount: underlying_request_amount,
-                    new_share_price: new_share_price
-                }
-            } else {
-                let dust_limit_factor = self.dust_limit.read();
-                let dust_limit = (l1_net_asset_value * dust_limit_factor) / CONSTANTS::WAD;
-
-                if (dust_limit > remaining_buffer_mem) {
-                    // We are fine
-                    self.buffer.write(remaining_buffer_mem);
-                    self.underlying_transit.write(0);
-
-                    self._check_profit_and_mint(profit, token);
-
-                    let new_share_price = self._convert_to_assets(one_share_unit);
-
-                    StrategyReportL2 {
-                        l1_strategy: l1_strategy,
-                        action_id: 1,
-                        amount: 0,
-                        new_share_price: new_share_price
-                    }
-                } else {
-                    // We deposit underlying to L1
-                    self.buffer.write(0);
-                    self.underlying_transit.write(remaining_buffer_mem);
-                    self._check_profit_and_mint(profit, token);
-                    assert(self.underlying.read().is_non_zero(), 'ZERO UND');
-                    let underlying_disp = ERC20ABIDispatcher {
-                        contract_address: self.underlying.read()
-                    };
-                    underlying_disp.transfer(self.pooling_manager.read(), remaining_buffer_mem);
-                    let new_share_price = self._convert_to_assets(one_share_unit);
-
-                    StrategyReportL2 {
-                        l1_strategy: l1_strategy,
-                        action_id: 0,
-                        amount: remaining_buffer_mem,
-                        new_share_price: new_share_price
-                    }
-                }
+            let new_share_price = self._convert_to_assets(one_share_unit);
+            StrategyReportL2 {
+                l1_strategy: self.l1_strategy.read(),
+                action_id: action_id,
+                amount: amount,
+                new_share_price: new_share_price
             }
         }
     }
@@ -668,8 +521,7 @@ mod TokenManager {
         fn _total_assets(self: @ContractState) -> u256 {
             let epoch = self.epoch.read();
             let handled_epoch_withdrawal_len = self.handled_epoch_withdrawal_len.read();
-            let total_underlying_due = self
-                ._total_underlying_due(handled_epoch_withdrawal_len, epoch);
+            let total_underlying_due = self._total_underlying_due(handled_epoch_withdrawal_len, epoch);
             let buffer = self.buffer.read();
             let l1_net_asset_value = self.l1_net_asset_value.read();
             let underlying_transit = self.underlying_transit.read();
@@ -705,6 +557,14 @@ mod TokenManager {
         fn _withdrawal_exchange_rate(self: @ContractState, epoch: u256) -> u256 {
             let withdrawal_pool = self.withdrawal_pool.read(epoch);
             let withdrawal_share = self.withdrawal_share.read(epoch);
+            self._withdrawal_exchange_rate_calc(withdrawal_pool, withdrawal_share)
+        }
+
+        /// @notice Calculates the withdrawal exchange rate
+        /// @param withdrawal_pool the amount of assets in the withdrawal pool for an epoch
+        /// @param withdrawal_share the amount of shares in the withdrawal pool for an epoch
+        /// @return The withdrawal exchange rate
+        fn _withdrawal_exchange_rate_calc(self: @ContractState, withdrawal_pool: u256, withdrawal_share: u256) -> u256 {
             ((withdrawal_pool + 1) * CONSTANTS::WAD) / (withdrawal_share + 1)
         }
 
@@ -719,9 +579,7 @@ mod TokenManager {
         /// @notice Sets the deposit limits for the contract
         /// @param new_deposit_limit_low The new low limit for deposits
         /// @param new_deposit_limit_high The new high limit for deposits
-        fn _set_deposit_limit(
-            ref self: ContractState, new_deposit_limit_low: u256, new_deposit_limit_high: u256
-        ) {
+        fn _set_deposit_limit(ref self: ContractState, new_deposit_limit_low: u256, new_deposit_limit_high: u256) {
             assert(new_deposit_limit_low.is_non_zero(), Errors::ZERO_AMOUNT);
             assert(new_deposit_limit_high > new_deposit_limit_low, Errors::INVALID_LIMIT);
             self.deposit_limit_low.write(new_deposit_limit_low);
@@ -754,15 +612,128 @@ mod TokenManager {
             self.dust_limit.write(new_dust_limit);
         }
 
+        /// @notice Calculates profit or loss and handles loss if incurred.
+        /// @param epoch The current epoch.
+        /// @param handled_epoch_withdrawal_len The length of handled epoch withdrawals.
+        /// @param new_l1_net_asset_value The new L1 net asset value.
+        /// @param underlying_bridged_amount The amount of underlying asset bridged.
+        /// @param buffer The buffer amount.
+        /// @return profit The calculated profit or zero in case of a loss.
+        fn _calculate_profit_and_handle_loss(
+            ref self: ContractState,
+            epoch: u256,
+            handled_epoch_withdrawal_len: u256,
+            received_from_l1: u256,
+            buffer: u256
+        ) -> u256 {
+            let sent_to_l1 = self.l1_net_asset_value.read() + self.underlying_transit.read();
+            if (received_from_l1 < sent_to_l1) {
+                let loss = sent_to_l1 - received_from_l1;
+                let amount_to_consider = buffer + sent_to_l1;
+                let mut i = handled_epoch_withdrawal_len;
+                loop {
+                    if (i > epoch) {
+                        break ();
+                    }
+                    let withdrawal_pool = self.withdrawal_pool.read(i);
+                    let withdrawal_epoch_loss_incured = (loss * withdrawal_pool) / amount_to_consider;
+                    self.withdrawal_pool.write(i, withdrawal_pool - withdrawal_epoch_loss_incured);
+                    i += 1;
+                };
+                0
+            } else {
+                received_from_l1 - sent_to_l1
+            }
+        }
+
+        /// @notice Handles withdrawals for a given epoch.
+        /// @dev Calculates the remaining and needed assets after processing withdrawals.
+        /// @param epoch The current epoch for which withdrawals are being processed.
+        /// @param handled_epoch_withdrawal_len The length of withdrawals already handled in the current epoch.
+        /// @param withdrawal_epoch_delay The delay after which withdrawals can be processed.
+        /// @param underlying_bridged_amount The amount of underlying assets bridged to the contract.
+        /// @param buffer The buffer amount in the contract.
+        /// @return A tuple containing the remaining assets after withdrawals and the additional assets needed.
+        fn _handle_withdrawals(
+            ref self: ContractState,
+            epoch: u256,
+            handled_epoch_withdrawal_len: u256,
+            withdrawal_epoch_delay: u256,
+            underlying_bridged_amount: u256,
+            buffer: u256
+        ) -> (u256, u256) {
+            let mut remaining_assets = underlying_bridged_amount + buffer;
+            let mut needed_assets = 0;
+
+            if (epoch >= withdrawal_epoch_delay) {
+                let mut new_handled_epoch_withdrawal_len = handled_epoch_withdrawal_len;
+                let mut j = handled_epoch_withdrawal_len;
+                let limit_epoch = epoch - withdrawal_epoch_delay;
+                loop {
+                    if (j > limit_epoch) {
+                        break ();
+                    }
+
+                    let withdrawal_pool = self.withdrawal_pool.read(j);
+
+                    if (remaining_assets >= withdrawal_pool) {
+                        remaining_assets -= withdrawal_pool;
+                        new_handled_epoch_withdrawal_len += 1;
+                    } else {
+                        needed_assets += withdrawal_pool - remaining_assets;
+                    }
+
+                    j += 1;
+                };
+                if (new_handled_epoch_withdrawal_len > handled_epoch_withdrawal_len) {
+                    self.handled_epoch_withdrawal_len.write(new_handled_epoch_withdrawal_len);
+                }
+            }
+            (remaining_assets, needed_assets)
+        }
+
+
+        /// @notice Handles the result of withdrawal and deposit operations.
+        /// @dev Updates the contract state based on the remaining and needed assets, and performs necessary transfers.
+        /// @param remaining_assets The remaining assets after processing withdrawals.
+        /// @param needed_assets The additional assets needed to fulfill all withdrawals.
+        /// @param new_l1_net_asset_value The new net asset value on L1.
+        /// @return A tuple indicating the operation type (withdrawal or deposit) and the amount involved.
+        fn _handle_result(
+            ref self: ContractState, remaining_assets: u256, needed_assets: u256, new_l1_net_asset_value: u256
+        ) -> (u256, u256) {
+            if (needed_assets > 0) {
+                self.buffer.write(remaining_assets);
+                self.underlying_transit.write(0);
+                (CONSTANTS::WITHDRAWAL, needed_assets)
+            } else {
+                let dust_limit_factor = self.dust_limit.read();
+                let dust_limit = (new_l1_net_asset_value * dust_limit_factor) / CONSTANTS::WAD;
+                if (dust_limit > remaining_assets) {
+                    self.buffer.write(remaining_assets);
+                    self.underlying_transit.write(0);
+                    (CONSTANTS::REPORT, 0)
+                } else {
+                    self.buffer.write(0);
+                    self.underlying_transit.write(remaining_assets);
+                    let underlying_disp = ERC20ABIDispatcher { contract_address: self.underlying.read() };
+                    underlying_disp.transfer(self.pooling_manager.read(), remaining_assets);
+                    (CONSTANTS::DEPOSIT, remaining_assets)
+                }
+            }
+        }
+
+        /// @notice Checks the profit made and mints new tokens as performance fees.
+        /// @dev Mints new tokens proportional to the profit made and the performance fees.
+        /// @param profit The profit made in the current epoch.
+        /// @param token The address of the token contract to mint new tokens.
         fn _check_profit_and_mint(ref self: ContractState, profit: u256, token: ContractAddress) {
             if (profit > 0) {
                 let performance_fees = self.performance_fees.read();
                 let performance_fees_from_profit = (profit * performance_fees) / CONSTANTS::WAD;
                 let shares_to_mint = self._convert_to_shares(performance_fees_from_profit);
                 let pooling_manager = self.pooling_manager.read();
-                let pooling_manager_disp = IPoolingManagerDispatcher {
-                    contract_address: pooling_manager
-                };
+                let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
                 let fees_recipient = pooling_manager_disp.fees_recipient();
                 let token_disp = ITokenDispatcher { contract_address: token };
                 token_disp.mint(fees_recipient, shares_to_mint);
