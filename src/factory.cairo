@@ -1,2 +1,2 @@
-mod factory;
 mod interface;
+mod factory;

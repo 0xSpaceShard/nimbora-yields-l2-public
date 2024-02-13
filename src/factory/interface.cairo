@@ -28,7 +28,9 @@ trait IFactory<TContractState> {
         dust_limit: u256
     ) -> (ContractAddress, ContractAddress);
 
-    fn set_token_manager_class_hash(ref self: TContractState, new_token_manager_class_hash: ClassHash);
+    fn set_token_manager_class_hash(
+        ref self: TContractState, new_token_manager_class_hash: ClassHash
+    );
 
     fn set_token_class_hash(ref self: TContractState, new_token_class_hash: ClassHash);
     

@@ -1,10 +1,11 @@
 #[starknet::contract]
 mod Token {
-    use nimbora_yields::token::interface::{IToken};
     use openzeppelin::token::erc20::{ERC20Component, interface};
     use openzeppelin::upgrades::UpgradeableComponent;
 
     use starknet::{ContractAddress, get_caller_address, ClassHash};
+
+    use nimbora_yields::token::interface::{IToken};
 
     component!(path: ERC20Component, storage: erc20, event: ERC20Event);
     component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
@@ -50,7 +51,11 @@ mod Token {
     /// @param decimals The number of decimals for the token
     #[constructor]
     fn constructor(
-        ref self: ContractState, token_manager: ContractAddress, name: felt252, symbol: felt252, decimals: u8
+        ref self: ContractState,
+        token_manager: ContractAddress,
+        name: felt252,
+        symbol: felt252,
+        decimals: u8
     ) {
         self.erc20.initializer(name, symbol);
         self.token_manager.write(token_manager);

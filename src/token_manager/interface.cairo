@@ -56,15 +56,21 @@ trait ITokenManager<TContractState> {
 
     fn set_performance_fees(ref self: TContractState, new_performance_fees: u256);
 
-    fn set_deposit_limit(ref self: TContractState, new_deposit_limit_low: u256, new_deposit_limit_high: u256);
+    fn set_deposit_limit(
+        ref self: TContractState, new_deposit_limit_low: u256, new_deposit_limit_high: u256
+    );
 
-    fn set_withdrawal_limit(ref self: TContractState, new_withdrawal_limit_low: u256, new_withdrawal_limit_high: u256);
+    fn set_withdrawal_limit(
+        ref self: TContractState, new_withdrawal_limit_low: u256, new_withdrawal_limit_high: u256
+    );
 
     fn set_withdrawal_epoch_delay(ref self: TContractState, new_withdrawal_epoch_delay: u256);
 
     fn set_dust_limit(ref self: TContractState, new_dust_limit: u256);
 
-    fn deposit(ref self: TContractState, assets: u256, receiver: ContractAddress, referal: ContractAddress);
+    fn deposit(
+        ref self: TContractState, assets: u256, receiver: ContractAddress, referal: ContractAddress
+    );
 
     fn request_withdrawal(ref self: TContractState, shares: u256);
 
