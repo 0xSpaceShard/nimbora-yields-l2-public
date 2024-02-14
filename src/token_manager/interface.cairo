@@ -50,6 +50,8 @@ trait ITokenManager<TContractState> {
     fn withdrawal_exchange_rate(self: @TContractState, epoch: u256) -> u256;
     fn withdrawal_pool(self: @TContractState, epoch: u256) -> u256;
     fn withdrawal_share(self: @TContractState, epoch: u256) -> u256;
+    fn convert_to_shares(self: @TContractState, amount: u256) -> u256;
+    fn convert_to_assets(self: @TContractState, shares: u256) -> u256;
 
 
     fn initialiser(ref self: TContractState, token: ContractAddress);

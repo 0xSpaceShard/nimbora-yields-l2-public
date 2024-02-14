@@ -252,6 +252,20 @@ mod TokenManager {
             self.withdrawal_share.read(epoch)
         }
 
+        /// @notice Converts a given amount of assets to shares
+        /// @param amount The amount of assets to convert
+        /// @return The equivalent amount of shares
+        fn convert_to_shares(self: @ContractState, amount: u256) -> u256 {
+            self._convert_to_shares(amount)
+        }
+
+        /// @notice Converts a given amount of shares to assets
+        /// @param amount The amount of shares to convert
+        /// @return asset amount
+        fn convert_to_assets(self: @ContractState, shares: u256) -> u256 {
+            self._convert_to_assets(shares)
+        }
+
         /// @notice Sets the token for this contract
         /// @dev Only callable by the pooling manager
         /// @param token The contract address of the token
