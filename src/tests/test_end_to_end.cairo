@@ -1136,7 +1136,7 @@ mod testEndToEnd {
         let (from, event) = spy.events.at(0);
         assert(event.keys.at(0) == @event_name_hash('RequestWithdrawal'), 'Wrong event name');
 
-        token_manager.claim_withdrawal(receiver, 0);
+        token_manager.claim_withdrawal(0);
 
         stop_prank(CheatTarget::One(token_manager.contract_address));
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
@@ -1267,7 +1267,7 @@ mod testEndToEnd {
         let balance_before = underlying_token.balance_of(token_manager.contract_address);
         assert(balance_before == 2000000000000000002, 'Wrong balance before');
 
-        token_manager.claim_withdrawal(receiver, 0);
+        token_manager.claim_withdrawal(0);
 
         let balance_after = underlying_token.balance_of(token_manager.contract_address);
         assert(balance_after == 0, 'Wrong balance after');
