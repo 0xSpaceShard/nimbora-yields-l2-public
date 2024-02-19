@@ -1,9 +1,9 @@
 #[starknet::contract]
 mod TokenMock {
+    use nimbora_yields::token_bridge::interface::{IMintableToken};
     use openzeppelin::token::erc20::ERC20Component;
     use openzeppelin::upgrades::UpgradeableComponent;
     use starknet::{ContractAddress, ClassHash};
-    use nimbora_yields::token_bridge::interface::{IMintableToken};
 
     component!(path: ERC20Component, storage: erc20, event: ERC20Event);
     component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
@@ -51,7 +51,7 @@ mod TokenMock {
         self.upgradeable._upgrade(new_class_hash);
     }
 
-    #[external(v0)]
+    #[abi(embed_v0)]
     impl MintableToken of IMintableToken<ContractState> {
         fn permissionedMint(ref self: ContractState, account: ContractAddress, amount: u256) {
             self.erc20._mint(account, amount);

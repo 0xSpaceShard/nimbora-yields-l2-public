@@ -1,31 +1,29 @@
 #[starknet::contract]
 mod PoolingManager {
-    // Starknet import
-    use starknet::{
-        ContractAddress, get_caller_address, eth_address::{EthAddress, EthAddressZeroable},
-        Zeroable, ClassHash, syscalls::{send_message_to_l1_syscall}
-    };
-    use core::nullable::{nullable_from_box, match_nullable, FromNullableResult};
     use core::integer::{u128_byte_reverse};
+    use core::nullable::{nullable_from_box, match_nullable, FromNullableResult};
+
+    // Local import
+    use nimbora_yields::pooling_manager::interface::{IPoolingManager, StrategyReportL1, BridgeInteractionInfo};
+    use nimbora_yields::token_bridge::interface::{ITokenBridgeDispatcher, ITokenBridgeDispatcherTrait};
+    use nimbora_yields::token_manager::interface::{
+        ITokenManagerDispatcher, ITokenManagerDispatcherTrait, StrategyReportL2
+    };
+    use nimbora_yields::utils::{CONSTANTS, MATH};
 
     // OZ import
     use openzeppelin::access::accesscontrol::{
         AccessControlComponent, interface::{IAccessControlDispatcher, IAccessControlDispatcherTrait}
     };
-    use openzeppelin::token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
     use openzeppelin::introspection::src5::SRC5Component;
+    use openzeppelin::token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
     use openzeppelin::upgrades::UpgradeableComponent;
+    // Starknet import
+    use starknet::{
+        ContractAddress, get_caller_address, eth_address::{EthAddress, EthAddressZeroable}, Zeroable, ClassHash,
+        syscalls::{send_message_to_l1_syscall}
+    };
 
-    // Local import
-    use nimbora_yields::pooling_manager::interface::{
-        IPoolingManager, StrategyReportL1, BridgeInteractionInfo
-    };
-    use nimbora_yields::token_manager::interface::{
-        ITokenManagerDispatcher, ITokenManagerDispatcherTrait, StrategyReportL2
-    };
-    use nimbora_yields::token_bridge::interface::{
-        ITokenBridgeDispatcher, ITokenBridgeDispatcherTrait
-    };
 
     // Components
     component!(path: AccessControlComponent, storage: accesscontrol, event: AccessControlEvent);
@@ -35,8 +33,7 @@ mod PoolingManager {
     impl InternalUpgradeableImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
     #[abi(embed_v0)]
-    impl AccessControlImpl =
-        AccessControlComponent::AccessControlImpl<ContractState>;
+    impl AccessControlImpl = AccessControlComponent::AccessControlImpl<ContractState>;
     impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
 
     #[storage]
@@ -225,7 +222,7 @@ mod PoolingManager {
         const UNKNOWN_STRATEGY: felt252 = 'Unknown strategy';
         const TOTAL_ASSETS_NUL: felt252 = 'Total assets nul';
         const NOT_INITIALISED: felt252 = 'Not initialised';
-        const BUFFER_NUL: felt252 = 'Buffer is nul';
+        const BUFFER_NULL: felt252 = 'Buffer is null';
         const INVALID_EPOCH: felt252 = 'Invalid Epoch';
     }
 
@@ -244,7 +241,6 @@ mod PoolingManager {
         self.accesscontrol.assert_only_role(0);
         self.upgradeable._upgrade(new_class_hash);
     }
-
 
     #[external(v0)]
     fn get_pending_strategies_len(self: @ContractState) -> u256 {
@@ -310,18 +306,14 @@ mod PoolingManager {
         /// @notice Maps L1 strategy to token manager
         /// @param l1_strategy The L1 strategy address
         /// @return The corresponding token manager address
-        fn l1_strategy_to_token_manager(
-            self: @ContractState, l1_strategy: EthAddress
-        ) -> ContractAddress {
+        fn l1_strategy_to_token_manager(self: @ContractState, l1_strategy: EthAddress) -> ContractAddress {
             self.l1_strategy_to_token_manager.read(l1_strategy)
         }
 
         /// @notice Maps the underlying asset to its corresponding bridge
         /// @param underlying The address of the underlying asset
         /// @return The address of the corresponding bridge
-        fn underlying_to_bridge(
-            self: @ContractState, underlying: ContractAddress
-        ) -> ContractAddress {
+        fn underlying_to_bridge(self: @ContractState, underlying: ContractAddress) -> ContractAddress {
             self.underlying_to_bridge.read(underlying)
         }
 
@@ -359,10 +351,7 @@ mod PoolingManager {
             strategy_report_l2: Span<StrategyReportL2>,
             bridge_withdrawal_info: Span<BridgeInteractionInfo>
         ) -> u256 {
-            self
-                ._hash_l2_data(
-                    new_epoch, bridge_deposit_info, strategy_report_l2, bridge_withdrawal_info
-                )
+            self._hash_l2_data(new_epoch, bridge_deposit_info, strategy_report_l2, bridge_withdrawal_info)
         }
 
         /// @notice Reads the general epoch
@@ -411,10 +400,7 @@ mod PoolingManager {
         /// @dev This function can only be called by an account with the appropriate role
         /// @param new_l1_pooling_manager The new L1 pooling manager address
         fn set_allowance(
-            ref self: ContractState,
-            spender: ContractAddress,
-            token_address: ContractAddress,
-            amount: u256
+            ref self: ContractState, spender: ContractAddress, token_address: ContractAddress, amount: u256
         ) {
             self.accesscontrol.assert_only_role(0);
             assert(spender.is_non_zero() && token_address.is_non_zero(), Errors::ZERO_ADDRESS);
@@ -450,25 +436,15 @@ mod PoolingManager {
             self._assert_caller_is_factory();
             let bridge = self.underlying_to_bridge.read(underlying);
             assert(bridge.is_non_zero(), Errors::NOT_SUPPORTED);
-            let token_manager_disp = ITokenManagerDispatcher {
-                contract_address: token_manager_deployed_address
-            };
+            let token_manager_disp = ITokenManagerDispatcher { contract_address: token_manager_deployed_address };
             token_manager_disp.initialiser(token_deployed_address);
-            let current_l1_strategy_to_token_manager = self
-                .l1_strategy_to_token_manager
-                .read(l1_strategy);
+            let current_l1_strategy_to_token_manager = self.l1_strategy_to_token_manager.read(l1_strategy);
             assert(current_l1_strategy_to_token_manager.is_zero(), Errors::ALREADY_REGISTERED);
             self.l1_strategy_to_token_manager.write(l1_strategy, token_manager_deployed_address);
 
-            let pending_strategies_to_initialize_len = self
-                .pending_strategies_to_initialize_len
-                .read();
-            self
-                .pending_strategies_to_initialize
-                .write(pending_strategies_to_initialize_len, l1_strategy);
-            self
-                .pending_strategies_to_initialize_len
-                .write(pending_strategies_to_initialize_len + 1);
+            let pending_strategies_to_initialize_len = self.pending_strategies_to_initialize_len.read();
+            self.pending_strategies_to_initialize.write(pending_strategies_to_initialize_len, l1_strategy);
+            self.pending_strategies_to_initialize_len.write(pending_strategies_to_initialize_len + 1);
             self
                 .emit(
                     StrategyRegistered {
@@ -493,27 +469,15 @@ mod PoolingManager {
         ///        It ensures that the underlying asset can be bridged properly and is a critical part of setting up the contract's infrastructure. 
         ///        The function also emits an event upon successful registration.
         fn register_underlying(
-            ref self: ContractState,
-            underlying: ContractAddress,
-            bridge: ContractAddress,
-            l1_bridge: felt252
+            ref self: ContractState, underlying: ContractAddress, bridge: ContractAddress, l1_bridge: felt252
         ) {
             self.accesscontrol.assert_only_role(0);
-            assert(
-                underlying.is_non_zero() && bridge.is_non_zero() && l1_bridge.is_non_zero(),
-                Errors::ZERO_ADDRESS
-            );
-            let bridge_disp = ITokenBridgeDispatcher { contract_address: bridge };
+            assert(underlying.is_non_zero() && bridge.is_non_zero() && l1_bridge.is_non_zero(), Errors::ZERO_ADDRESS);
             self.underlying_to_bridge.write(underlying, bridge);
-            // let l1_bridge = bridge_disp.get_l1_bridge();
             self.l2_bridge_to_l1_bridge.write(bridge, l1_bridge);
-            self
-                .emit(
-                    UnderlyingRegistered {
-                        underlying: underlying, bridge: bridge, l1_bridge: l1_bridge
-                    }
-                );
+            self.emit(UnderlyingRegistered { underlying: underlying, bridge: bridge, l1_bridge: l1_bridge });
         }
+
 
         /// @notice Handles a mass report of L1 strategy data, processing and updating L2 state accordingly
         /// @dev This function processes reports from L1, verifies data integrity, and performs necessary transfers and updates
@@ -525,29 +489,15 @@ mod PoolingManager {
         ///       After processing all elements, it initiates withdrawals to L1 and emits an event with the new L2 report data.
         ///       The function ensures that only valid and expected data is processed and that the contract's state remains consistent with L1.
         fn handle_mass_report(ref self: ContractState, calldata: Span<StrategyReportL1>) {
-            let general_epoch = self.general_epoch.read();
-            let l1_report_hash = self.l1_report_hash.read(general_epoch);
-
-            if (general_epoch.is_non_zero()) {
-                assert(l1_report_hash.is_non_zero(), Errors::NO_L1_REPORT);
-                let calldata_hash = self._hash_l1_data(calldata);
-                assert(calldata_hash == l1_report_hash, Errors::INVALID_DATA);
-            } else {
-                assert(calldata.len() == 0, Errors::INVALID_DATA);
-                let is_initialised = self._is_initialised();
-                assert(is_initialised, Errors::NOT_INITIALISED);
-            }
-
+            let new_epoch = self._verify_calldata_and_increase_epoch(calldata);
+            let l1_pooling_manager = self.l1_pooling_manager.read();
             let full_strategy_report_l1 = self._add_pending_strategies_to_initialize(calldata);
 
             let array_len = full_strategy_report_l1.len();
             assert(array_len.is_non_zero(), Errors::EMPTY_ARRAY);
-
             let mut strategy_report_l2_array = ArrayTrait::new();
-
             let mut dict_bridge_deposit_keys = ArrayTrait::new();
             let mut bridge_deposit_amount: Felt252Dict<Nullable<u256>> = Default::default();
-
             let mut dict_bridge_withdrawal_keys = ArrayTrait::new();
             let mut bridge_withdrawal_amount: Felt252Dict<Nullable<u256>> = Default::default();
 
@@ -557,6 +507,19 @@ mod PoolingManager {
                     break ();
                 }
                 let elem = *full_strategy_report_l1.at(i);
+                if (!elem.processed) {
+                    strategy_report_l2_array
+                        .append(
+                            StrategyReportL2 {
+                                l1_strategy: elem.l1_strategy,
+                                action_id: elem.l1_net_asset_value,
+                                amount: elem.underlying_bridged_amount,
+                                new_share_price: 0
+                            }
+                        );
+                    i += 1;
+                    continue;
+                }
                 let strategy = self.l1_strategy_to_token_manager.read(elem.l1_strategy);
                 let strategy_disp = ITokenManagerDispatcher { contract_address: strategy };
                 let underlying = strategy_disp.underlying();
@@ -564,13 +527,13 @@ mod PoolingManager {
                 if (elem.underlying_bridged_amount.is_non_zero()) {
                     underlying_disp.transfer(strategy, elem.underlying_bridged_amount);
                 }
-                let ret = strategy_disp
-                    .handle_report(elem.l1_net_asset_value, elem.underlying_bridged_amount);
+                let ret = strategy_disp.handle_report(elem.l1_net_asset_value, elem.underlying_bridged_amount);
                 strategy_report_l2_array.append(ret);
 
-                if (ret.action_id == 0) {
+                if (ret.action_id == CONSTANTS::DEPOSIT) {
                     let bridge = self.underlying_to_bridge.read(underlying);
                     let val = bridge_deposit_amount.get(bridge.into());
+
                     let current_bridge_deposit_amount: u256 = match match_nullable(val) {
                         FromNullableResult::Null => 0,
                         FromNullableResult::NotNull(val) => val.unbox(),
@@ -580,14 +543,12 @@ mod PoolingManager {
                         dict_bridge_deposit_keys.append(bridge);
                         bridge_deposit_amount.insert(bridge.into(), new_amount);
                     } else {
-                        let new_amount = nullable_from_box(
-                            BoxTrait::new(ret.amount + current_bridge_deposit_amount)
-                        );
+                        let new_amount = nullable_from_box(BoxTrait::new(ret.amount + current_bridge_deposit_amount));
                         bridge_deposit_amount.insert(bridge.into(), new_amount);
                     }
                 }
 
-                if (ret.action_id == 2) {
+                if (ret.action_id == CONSTANTS::WITHDRAWAL) {
                     let bridge = self.underlying_to_bridge.read(underlying);
                     let val = bridge_withdrawal_amount.get(bridge.into());
                     let current_bridge_withdrawal_amount: u256 = match match_nullable(val) {
@@ -608,8 +569,6 @@ mod PoolingManager {
                 i += 1;
             };
 
-            let l1_pooling_manager = self.l1_pooling_manager.read();
-
             let mut bridge_deposit_info = ArrayTrait::new();
             let mut j = 0;
             let dict_bridge_deposit_keys_len = dict_bridge_deposit_keys.len();
@@ -627,8 +586,7 @@ mod PoolingManager {
                 bridge_disp.initiate_withdraw(l1_pooling_manager.into(), amount);
 
                 let l1_bridge = self.l2_bridge_to_l1_bridge.read(bridge_address);
-                bridge_deposit_info
-                    .append(BridgeInteractionInfo { l1_bridge: l1_bridge, amount: amount });
+                bridge_deposit_info.append(BridgeInteractionInfo { l1_bridge: l1_bridge, amount: amount });
                 j += 1;
             };
 
@@ -647,13 +605,9 @@ mod PoolingManager {
                 };
 
                 let l1_bridge = self.l2_bridge_to_l1_bridge.read(bridge_address);
-                bridge_withdrawal_info
-                    .append(BridgeInteractionInfo { l1_bridge: l1_bridge, amount: amount });
+                bridge_withdrawal_info.append(BridgeInteractionInfo { l1_bridge: l1_bridge, amount: amount });
                 j += 1;
             };
-
-            let new_epoch = general_epoch + 1;
-            self.general_epoch.write(new_epoch);
 
             let ret_hash = self
                 ._hash_l2_data(
@@ -665,9 +619,7 @@ mod PoolingManager {
             let mut message_payload: Array<felt252> = ArrayTrait::new();
             message_payload.append(ret_hash.low.into());
             message_payload.append(ret_hash.high.into());
-            send_message_to_l1_syscall(
-                to_address: l1_pooling_manager.into(), payload: message_payload.span()
-            );
+            send_message_to_l1_syscall(to_address: l1_pooling_manager.into(), payload: message_payload.span());
             self
                 .emit(
                     NewL2Report {
@@ -682,9 +634,7 @@ mod PoolingManager {
         fn delete_all_pending_strategy(ref self: ContractState) {
             self.accesscontrol.assert_only_role(0);
             let mut i = 0;
-            let pending_strategies_to_initialize_len = self
-                .pending_strategies_to_initialize_len
-                .read();
+            let pending_strategies_to_initialize_len = self.pending_strategies_to_initialize_len.read();
             loop {
                 if (i == pending_strategies_to_initialize_len) {
                     break ();
@@ -702,10 +652,7 @@ mod PoolingManager {
         /// @param new_min_deposit_limit The updated minimum deposit limit
         /// @param new_max_deposit_limit The updated maximum deposit limit
         fn emit_deposit_limit_updated_event(
-            ref self: ContractState,
-            l1_strategy: EthAddress,
-            new_min_deposit_limit: u256,
-            new_max_deposit_limit: u256
+            ref self: ContractState, l1_strategy: EthAddress, new_min_deposit_limit: u256, new_max_deposit_limit: u256
         ) {
             self._assert_caller_is_registered_token_manager(l1_strategy);
             self
@@ -748,12 +695,7 @@ mod PoolingManager {
             ref self: ContractState, l1_strategy: EthAddress, new_performance_fees: u256
         ) {
             self._assert_caller_is_registered_token_manager(l1_strategy);
-            self
-                .emit(
-                    PerformanceFeesUpdated {
-                        l1_strategy: l1_strategy, new_performance_fees: new_performance_fees
-                    }
-                );
+            self.emit(PerformanceFeesUpdated { l1_strategy: l1_strategy, new_performance_fees: new_performance_fees });
         }
 
 
@@ -809,12 +751,7 @@ mod PoolingManager {
             self
                 .emit(
                     RequestWithdrawal {
-                        l1_strategy: l1_strategy,
-                        caller: caller,
-                        assets: assets,
-                        shares: shares,
-                        id: id,
-                        epoch: epoch
+                        l1_strategy: l1_strategy, caller: caller, assets: assets, shares: shares, id: id, epoch: epoch
                     }
                 );
         }
@@ -826,20 +763,13 @@ mod PoolingManager {
         /// @param id The unique identifier of the withdrawal for a user
         /// @param underlying_amount The amount of underlying asset withdrawn
         fn emit_claim_withdrawal_event(
-            ref self: ContractState,
-            l1_strategy: EthAddress,
-            caller: ContractAddress,
-            id: u256,
-            underlying_amount: u256
+            ref self: ContractState, l1_strategy: EthAddress, caller: ContractAddress, id: u256, underlying_amount: u256
         ) {
             self._assert_caller_is_registered_token_manager(l1_strategy);
             self
                 .emit(
                     ClaimWithdrawal {
-                        l1_strategy: l1_strategy,
-                        caller: caller,
-                        id: id,
-                        underlying_amount: underlying_amount
+                        l1_strategy: l1_strategy, caller: caller, id: id, underlying_amount: underlying_amount
                     }
                 );
         }
@@ -855,8 +785,7 @@ mod PoolingManager {
             self
                 .emit(
                     WithdrawalEpochUpdated {
-                        l1_strategy: l1_strategy,
-                        new_withdrawal_epoch_delay: new_withdrawal_epoch_delay
+                        l1_strategy: l1_strategy, new_withdrawal_epoch_delay: new_withdrawal_epoch_delay
                     }
                 );
         }
@@ -866,14 +795,9 @@ mod PoolingManager {
         /// @dev Only callable by a registered token manager
         /// @param l1_strategy The Ethereum address of the L1 strategy
         /// @param new_dust_limit The updated dust limit
-        fn emit_dust_limit_updated_event(
-            ref self: ContractState, l1_strategy: EthAddress, new_dust_limit: u256
-        ) {
+        fn emit_dust_limit_updated_event(ref self: ContractState, l1_strategy: EthAddress, new_dust_limit: u256) {
             self._assert_caller_is_registered_token_manager(l1_strategy);
-            self
-                .emit(
-                    DustLimitUpdated { l1_strategy: l1_strategy, new_dust_limit: new_dust_limit }
-                );
+            self.emit(DustLimitUpdated { l1_strategy: l1_strategy, new_dust_limit: new_dust_limit });
         }
 
         /// @notice Emits an event when the token manager class hash is updated
@@ -883,20 +807,13 @@ mod PoolingManager {
             ref self: ContractState, new_token_manager_class_hash: ClassHash
         ) {
             self._assert_caller_is_factory();
-            self
-                .emit(
-                    TokenManagerClassHashUpdated {
-                        new_token_manager_class_hash: new_token_manager_class_hash
-                    }
-                );
+            self.emit(TokenManagerClassHashUpdated { new_token_manager_class_hash: new_token_manager_class_hash });
         }
 
         /// @notice Emits an event when the token class hash is updated
         /// @dev Only callable by the factory
         /// @param new_token_class_hash The updated class hash for the token
-        fn emit_token_class_hash_updated_event(
-            ref self: ContractState, new_token_class_hash: ClassHash
-        ) {
+        fn emit_token_class_hash_updated_event(ref self: ContractState, new_token_class_hash: ClassHash) {
             self._assert_caller_is_factory();
             self.emit(TokenClassHashUpdated { new_token_class_hash: new_token_class_hash });
         }
@@ -907,9 +824,7 @@ mod PoolingManager {
         /// @notice Asserts that the caller is a registered token manager for the given L1 strategy
         /// @dev Verifies if the caller address matches the registered token manager for the specified L1 strategy
         /// @param l1_strategy The Ethereum address of the L1 strategy
-        fn _assert_caller_is_registered_token_manager(
-            self: @ContractState, l1_strategy: EthAddress
-        ) {
+        fn _assert_caller_is_registered_token_manager(self: @ContractState, l1_strategy: EthAddress) {
             let caller = get_caller_address();
             let token_manager = self.l1_strategy_to_token_manager.read(l1_strategy);
             assert(token_manager == caller, Errors::INVALID_CALLER);
@@ -940,9 +855,7 @@ mod PoolingManager {
         /// @notice Converts a span of L1 strategy reports to a span of u256
         /// @param calldata Span of StrategyReportL1 data
         /// @return Span of u256 values representing the L1 strategy reports
-        fn _strategy_report_l1_to_u256_span(
-            self: @ContractState, calldata: Span<StrategyReportL1>
-        ) -> Span<u256> {
+        fn _strategy_report_l1_to_u256_span(self: @ContractState, calldata: Span<StrategyReportL1>) -> Span<u256> {
             let mut ret_array = ArrayTrait::new();
             let array_len = calldata.len();
             let mut i = 0;
@@ -956,6 +869,11 @@ mod PoolingManager {
                 ret_array.append(l1_strategy_u256);
                 ret_array.append(elem.l1_net_asset_value);
                 ret_array.append(elem.underlying_bridged_amount);
+                if (elem.processed) {
+                    ret_array.append(1);
+                } else {
+                    ret_array.append(0);
+                }
                 i += 1;
             };
             ret_array.span()
@@ -1001,6 +919,7 @@ mod PoolingManager {
                 ret_array.append(l1_strategy_u256);
                 ret_array.append(strategy_report_l2_elem.action_id);
                 ret_array.append(strategy_report_l2_elem.amount);
+                ret_array.append(1);
                 i += 1;
             };
 
@@ -1053,9 +972,7 @@ mod PoolingManager {
         /// @return Array of Ethereum addresses representing the pending strategies
         fn _pending_strategies_to_initialize(self: @ContractState) -> Array<EthAddress> {
             let mut i = 0;
-            let pending_strategies_to_initialize_len = self
-                .pending_strategies_to_initialize_len
-                .read();
+            let pending_strategies_to_initialize_len = self.pending_strategies_to_initialize_len.read();
             let mut ret_array = ArrayTrait::new();
             loop {
                 if (i == pending_strategies_to_initialize_len) {
@@ -1068,27 +985,23 @@ mod PoolingManager {
             ret_array
         }
 
-        // @notice Retrieves pending strategies to be initialized and delete
-        /// @return Array of Ethereum addresses representing the pending strategies
-        fn _get_pending_strategies_and_del(ref self: ContractState) -> Array<EthAddress> {
-            let mut i = 0;
-            let pending_strategies_to_initialize_len = self
-                .pending_strategies_to_initialize_len
-                .read();
-            let mut ret_array = ArrayTrait::new();
-            loop {
-                if (i == pending_strategies_to_initialize_len) {
-                    break ();
-                }
-                let elem = self.pending_strategies_to_initialize.read(i);
-                ret_array.append(elem);
-                self.pending_strategies_to_initialize.write(i, EthAddressZeroable::zero());
-                i += 1;
-            };
-            self.pending_strategies_to_initialize_len.write(0);
-
-            ret_array
+        fn _verify_calldata_and_increase_epoch(ref self: ContractState, calldata: Span<StrategyReportL1>) -> u256 {
+            let general_epoch = self.general_epoch.read();
+            if (general_epoch.is_non_zero()) {
+                let l1_report_hash = self.l1_report_hash.read(general_epoch);
+                assert(l1_report_hash.is_non_zero(), Errors::NO_L1_REPORT);
+                let calldata_hash = self._hash_l1_data(calldata);
+                assert(calldata_hash == l1_report_hash, Errors::INVALID_DATA);
+            } else {
+                assert(calldata.len() == 0, Errors::INVALID_DATA);
+                let is_initialised = self._is_initialised();
+                assert(is_initialised, Errors::NOT_INITIALISED);
+            }
+            let new_epoch = general_epoch + 1;
+            self.general_epoch.write(new_epoch);
+            new_epoch
         }
+
 
         /// @notice Adds pending strategies to be initialized to the span of StrategyReportL1 data
         /// @param calldata Span of StrategyReportL1 data
@@ -1116,18 +1029,36 @@ mod PoolingManager {
                 }
                 let mut l1_strategy = *pending_strategies_to_initialize.at(i.into());
                 let token_manager = self.l1_strategy_to_token_manager.read(l1_strategy);
-                let token_manager_disp = ITokenManagerDispatcher {
-                    contract_address: token_manager
-                };
+                let token_manager_disp = ITokenManagerDispatcher { contract_address: token_manager };
                 let buffer = token_manager_disp.buffer();
-                assert(buffer.is_non_zero(), Errors::BUFFER_NUL);
+                assert(buffer.is_non_zero(), Errors::BUFFER_NULL);
                 let new_elem = StrategyReportL1 {
-                    l1_strategy: l1_strategy, l1_net_asset_value: 0, underlying_bridged_amount: 0
+                    l1_strategy: l1_strategy, l1_net_asset_value: 0, underlying_bridged_amount: 0, processed: true
                 };
                 ret_array.append(new_elem);
                 i += 1;
             };
             ret_array.span()
+        }
+
+
+        // @notice Retrieves pending strategies to be initialized and delete
+        /// @return Array of Ethereum addresses representing the pending strategies
+        fn _get_pending_strategies_and_del(ref self: ContractState) -> Array<EthAddress> {
+            let mut i = 0;
+            let pending_strategies_to_initialize_len = self.pending_strategies_to_initialize_len.read();
+            let mut ret_array = ArrayTrait::new();
+            loop {
+                if (i == pending_strategies_to_initialize_len) {
+                    break ();
+                }
+                let elem = self.pending_strategies_to_initialize.read(i);
+                ret_array.append(elem);
+                self.pending_strategies_to_initialize.write(i, EthAddressZeroable::zero());
+                i += 1;
+            };
+            self.pending_strategies_to_initialize_len.write(0);
+            ret_array
         }
     }
 }

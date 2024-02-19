@@ -1,3 +1,3 @@
-mod mock_pooling_manager;
-mod mock_factory;
-mod mock_token_manager;
+mod mock_mintable_token;
+mod mock_random;
+mod mock_transfer;
