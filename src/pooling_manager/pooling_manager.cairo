@@ -69,8 +69,7 @@ mod PoolingManager {
         FeesRecipientUpdated: FeesRecipientUpdated,
         StrategyRegistered: StrategyRegistered,
         UnderlyingRegistered: UnderlyingRegistered,
-        DepositLimitUpdated: DepositLimitUpdated,
-        WithdrawalLimitUpdated: WithdrawalLimitUpdated,
+        TvlLimitUpdated: TvlLimitUpdated,
         PerformanceFeesUpdated: PerformanceFeesUpdated,
         WithdrawalEpochUpdated: WithdrawalEpochUpdated,
         DustLimitUpdated: DustLimitUpdated,
@@ -120,10 +119,7 @@ mod PoolingManager {
         l1_strategy: EthAddress,
         underlying: ContractAddress,
         performance_fees: u256,
-        min_deposit: u256,
-        max_deposit: u256,
-        min_withdrawal: u256,
-        max_withdrawal: u256
+        tvl_limit: u256,
     }
 
 
@@ -136,20 +132,10 @@ mod PoolingManager {
 
 
     #[derive(Drop, starknet::Event)]
-    struct DepositLimitUpdated {
+    struct TvlLimitUpdated {
         l1_strategy: EthAddress,
-        new_min_deposit_limit: u256,
-        new_max_deposit_limit: u256
+        new_tvl_limit: u256,
     }
-
-
-    #[derive(Drop, starknet::Event)]
-    struct WithdrawalLimitUpdated {
-        l1_strategy: EthAddress,
-        new_min_withdrawal_limit: u256,
-        new_max_withdrawal_limit: u256
-    }
-
 
     #[derive(Drop, starknet::Event)]
     struct PerformanceFeesUpdated {
@@ -415,10 +401,7 @@ mod PoolingManager {
         /// @param l1_strategy The Ethereum address of the L1 strategy
         /// @param underlying The contract address of the underlying asset for the strategy
         /// @param performance_fees The performance fee (as a percentage) associated with the strategy
-        /// @param min_deposit The minimum deposit amount allowed for the strategy
-        /// @param max_deposit The maximum deposit amount allowed for the strategy
-        /// @param min_withdrawal The minimum withdrawal amount allowed for the strategy
-        /// @param max_withdrawal The maximum withdrawal amount allowed for the strategy
+        /// @param tvl_limit The max TVL  allowed for the strategy
         /// @desc This function initializes a new strategy by setting up the token manager, registering the strategy with its L1 counterpart, 
         /// and defining the key parameters like deposit/withdrawal limits and fees. It also adds the strategy to a list of pending strategies to be initialized.
         fn register_strategy(
@@ -428,10 +411,7 @@ mod PoolingManager {
             l1_strategy: EthAddress,
             underlying: ContractAddress,
             performance_fees: u256,
-            min_deposit: u256,
-            max_deposit: u256,
-            min_withdrawal: u256,
-            max_withdrawal: u256
+            tvl_limit: u256,
         ) {
             self._assert_caller_is_factory();
             let bridge = self.underlying_to_bridge.read(underlying);
@@ -453,10 +433,7 @@ mod PoolingManager {
                         l1_strategy: l1_strategy,
                         underlying: underlying,
                         performance_fees: performance_fees,
-                        min_deposit: min_deposit,
-                        max_deposit: max_deposit,
-                        min_withdrawal: min_withdrawal,
-                        max_withdrawal: max_withdrawal
+                        tvl_limit: tvl_limit,
                     }
                 );
         }
@@ -646,45 +623,13 @@ mod PoolingManager {
         }
 
 
-        /// @notice Emits an event when deposit limits are updated for a strategy
+        /// @notice Emits an event when tvl limit is updated for a strategy
         /// @dev Only callable by a registered token manager
         /// @param l1_strategy The Ethereum address of the L1 strategy for which limits are updated
-        /// @param new_min_deposit_limit The updated minimum deposit limit
-        /// @param new_max_deposit_limit The updated maximum deposit limit
-        fn emit_deposit_limit_updated_event(
-            ref self: ContractState, l1_strategy: EthAddress, new_min_deposit_limit: u256, new_max_deposit_limit: u256
-        ) {
+        /// @param new_tvl_limit The updated tvl limit
+        fn emit_tvl_limit_updated_event(ref self: ContractState, l1_strategy: EthAddress, new_tvl_limit: u256) {
             self._assert_caller_is_registered_token_manager(l1_strategy);
-            self
-                .emit(
-                    DepositLimitUpdated {
-                        l1_strategy: l1_strategy,
-                        new_min_deposit_limit: new_min_deposit_limit,
-                        new_max_deposit_limit: new_max_deposit_limit
-                    }
-                );
-        }
-
-        /// @notice Emits an event when withdrawal limits are updated for a strategy
-        /// @dev Only callable by a registered token manager
-        /// @param l1_strategy The Ethereum address of the L1 strategy for which limits are updated
-        /// @param new_min_withdrawal_limit The updated minimum withdrawal limit
-        /// @param new_max_withdrawal_limit The updated maximum withdrawal limit
-        fn emit_withdrawal_limit_updated_event(
-            ref self: ContractState,
-            l1_strategy: EthAddress,
-            new_min_withdrawal_limit: u256,
-            new_max_withdrawal_limit: u256
-        ) {
-            self._assert_caller_is_registered_token_manager(l1_strategy);
-            self
-                .emit(
-                    WithdrawalLimitUpdated {
-                        l1_strategy: l1_strategy,
-                        new_min_withdrawal_limit: new_min_withdrawal_limit,
-                        new_max_withdrawal_limit: new_max_withdrawal_limit
-                    }
-                );
+            self.emit(TvlLimitUpdated { l1_strategy: l1_strategy, new_tvl_limit: new_tvl_limit });
         }
 
         /// @notice Emits an event when performance fees are updated for a strategy

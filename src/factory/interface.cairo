@@ -20,10 +20,7 @@ trait IFactory<TContractState> {
         token_name: felt252,
         token_symbol: felt252,
         performance_fees: u256,
-        min_deposit: u256,
-        max_deposit: u256,
-        min_withdrawal: u256,
-        max_withdrawal: u256,
+        tvl_limit: u256,
         withdrawal_epoch_delay: u256,
         dust_limit: u256
     ) -> (ContractAddress, ContractAddress);

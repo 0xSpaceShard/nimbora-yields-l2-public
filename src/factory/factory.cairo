@@ -132,10 +132,7 @@ mod Factory {
         /// @param token_name The name for the new token
         /// @param token_symbol The symbol for the new token
         /// @param performance_fees The performance fees for the strategy
-        /// @param min_deposit The minimum deposit limit
-        /// @param max_deposit The maximum deposit limit
-        /// @param min_withdrawal The minimum withdrawal limit
-        /// @param max_withdrawal The maximum withdrawal limit
+        /// @param tvl_limit The max tvl limit
         /// @param withdrawal_epoch_delay The delay in epochs for withdrawals
         /// @param dust_limit The dust limit for the strategy
         /// @return The addresses of the deployed token manager and token
@@ -146,10 +143,7 @@ mod Factory {
             token_name: felt252,
             token_symbol: felt252,
             performance_fees: u256,
-            min_deposit: u256,
-            max_deposit: u256,
-            min_withdrawal: u256,
-            max_withdrawal: u256,
+            tvl_limit: u256,
             withdrawal_epoch_delay: u256,
             dust_limit: u256
         ) -> (ContractAddress, ContractAddress) {
@@ -163,14 +157,8 @@ mod Factory {
                 underlying.into(),
                 performance_fees.low.into(),
                 performance_fees.high.into(),
-                min_deposit.low.into(),
-                min_deposit.high.into(),
-                max_deposit.low.into(),
-                max_deposit.high.into(),
-                min_withdrawal.low.into(),
-                min_withdrawal.high.into(),
-                max_withdrawal.low.into(),
-                max_withdrawal.high.into(),
+                tvl_limit.low.into(),
+                tvl_limit.high.into(),
                 withdrawal_epoch_delay.low.into(),
                 withdrawal_epoch_delay.high.into(),
                 dust_limit.low.into(),
@@ -206,10 +194,7 @@ mod Factory {
                     l1_strategy,
                     underlying,
                     performance_fees,
-                    min_deposit,
-                    max_deposit,
-                    min_withdrawal,
-                    max_withdrawal
+                    tvl_limit
                 );
             (token_manager_deployed_address, token_deployed_address)
         }

@@ -52,25 +52,16 @@ trait IPoolingManager<TContractState> {
         l1_strategy: EthAddress,
         underlying: ContractAddress,
         performance_fees: u256,
-        min_deposit: u256,
-        max_deposit: u256,
-        min_withdrawal: u256,
-        max_withdrawal: u256
+        tvl_limit: u256,
     );
     fn delete_all_pending_strategy(ref self: TContractState);
 
     fn register_underlying(
         ref self: TContractState, underlying: ContractAddress, bridge: ContractAddress, l1_bridge: felt252,
     );
-    fn emit_deposit_limit_updated_event(
-        ref self: TContractState, l1_strategy: EthAddress, new_min_deposit_limit: u256, new_max_deposit_limit: u256
-    );
-    fn emit_withdrawal_limit_updated_event(
-        ref self: TContractState,
-        l1_strategy: EthAddress,
-        new_min_withdrawal_limit: u256,
-        new_max_withdrawal_limit: u256
-    );
+
+    fn emit_tvl_limit_updated_event(ref self: TContractState, l1_strategy: EthAddress, new_tvl_limit: u256);
+
     fn emit_performance_fees_updated_event(
         ref self: TContractState, l1_strategy: EthAddress, new_performance_fees: u256
     );

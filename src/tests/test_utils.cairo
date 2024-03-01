@@ -132,10 +132,7 @@ fn deploy_token_manager() -> ITokenManagerDispatcher {
     let mut constructor_args: Array<felt252> = ArrayTrait::new();
     let l1_strategy_1: EthAddress = 2.try_into().unwrap();
     let performance_fees_strategy_1: u256 = 200000000000000000;
-    let min_deposit_1: u256 = 100000000000000000;
-    let max_deposit_1: u256 = 10000000000000000000;
-    let min_withdraw_1: u256 = 200000000000000000;
-    let max_withdraw_1: u256 = 2000000000000000000000000;
+    let tvl_limit: u256 = 10000000000000000000;
     let withdrawal_epoch_delay_1: u256 = 2;
     let dust_limit_1: u256 = 1000000000000000000;
 
@@ -143,10 +140,7 @@ fn deploy_token_manager() -> ITokenManagerDispatcher {
     Serde::serialize(@l1_strategy_1, ref constructor_args);
     Serde::serialize(@token_1.contract_address, ref constructor_args);
     Serde::serialize(@performance_fees_strategy_1, ref constructor_args);
-    Serde::serialize(@min_deposit_1, ref constructor_args);
-    Serde::serialize(@max_deposit_1, ref constructor_args);
-    Serde::serialize(@min_withdraw_1, ref constructor_args);
-    Serde::serialize(@max_withdraw_1, ref constructor_args);
+    Serde::serialize(@tvl_limit, ref constructor_args);
     Serde::serialize(@withdrawal_epoch_delay_1, ref constructor_args);
     Serde::serialize(@dust_limit_1, ref constructor_args);
 
@@ -157,28 +151,14 @@ fn deploy_token_manager() -> ITokenManagerDispatcher {
 }
 
 fn deploy_token_manager_and_provide_args() -> (
-    ITokenManagerDispatcher,
-    ContractAddress,
-    ContractAddress,
-    EthAddress,
-    ContractAddress,
-    u256,
-    u256,
-    u256,
-    u256,
-    u256,
-    u256,
-    u256
+    ITokenManagerDispatcher, ContractAddress, ContractAddress, EthAddress, ContractAddress, u256, u256, u256, u256
 ) {
     let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, _, token_manager_hash) = setup_0();
     let (token_1, _, _, _, _, _) = setup_1(owner, l1_pooling_manager, pooling_manager, fees_recipient, factory);
     let mut constructor_args: Array<felt252> = ArrayTrait::new();
     let l1_strategy_1: EthAddress = 2.try_into().unwrap();
     let performance_fees_strategy_1: u256 = 200000000000000000;
-    let min_deposit_1: u256 = 100000000000000000;
-    let max_deposit_1: u256 = 10000000000000000000;
-    let min_withdraw_1: u256 = 200000000000000000;
-    let max_withdraw_1: u256 = 2000000000000000000000000;
+    let tvl_limit: u256 = 10000000000000000000;
     let withdrawal_epoch_delay_1: u256 = 2;
     let dust_limit_1: u256 = 1000000000000000000;
 
@@ -186,10 +166,7 @@ fn deploy_token_manager_and_provide_args() -> (
     Serde::serialize(@l1_strategy_1, ref constructor_args);
     Serde::serialize(@token_1.contract_address, ref constructor_args);
     Serde::serialize(@performance_fees_strategy_1, ref constructor_args);
-    Serde::serialize(@min_deposit_1, ref constructor_args);
-    Serde::serialize(@max_deposit_1, ref constructor_args);
-    Serde::serialize(@min_withdraw_1, ref constructor_args);
-    Serde::serialize(@max_withdraw_1, ref constructor_args);
+    Serde::serialize(@tvl_limit, ref constructor_args);
     Serde::serialize(@withdrawal_epoch_delay_1, ref constructor_args);
     Serde::serialize(@dust_limit_1, ref constructor_args);
 
@@ -203,10 +180,7 @@ fn deploy_token_manager_and_provide_args() -> (
         l1_strategy_1,
         token_1.contract_address,
         performance_fees_strategy_1,
-        min_deposit_1,
-        max_deposit_1,
-        min_withdraw_1,
-        max_withdraw_1,
+        tvl_limit,
         withdrawal_epoch_delay_1,
         dust_limit_1
     );
@@ -309,10 +283,7 @@ fn deploy_strategy() -> (ContractAddress, ContractAddress, IPoolingManagerDispat
     );
     let l1_strategy_1: EthAddress = 2.try_into().unwrap();
     let performance_fees_strategy_1 = 200000000000000000;
-    let min_deposit_1 = 100000000000000000;
-    let max_deposit_1 = 10000000000000000000;
-    let min_withdraw_1 = 200000000000000000;
-    let max_withdraw_1 = 2000000000000000000000000;
+    let tvl_limit = 10000000000000000000;
     let withdrawal_epoch_delay_1 = 2;
     let dust_limit_1 = 1000000000000000000;
     let name_1 = 10;
@@ -326,10 +297,7 @@ fn deploy_strategy() -> (ContractAddress, ContractAddress, IPoolingManagerDispat
             name_1,
             symbol_1,
             performance_fees_strategy_1,
-            min_deposit_1,
-            max_deposit_1,
-            min_withdraw_1,
-            max_withdraw_1,
+            tvl_limit,
             withdrawal_epoch_delay_1,
             dust_limit_1
         );
@@ -357,10 +325,7 @@ fn deploy_two_strategy() -> (
     let l1_strategy_1: EthAddress = 2.try_into().unwrap();
     let l1_strategy_2: EthAddress = 3.try_into().unwrap();
     let performance_fees_strategy_1 = 200000000000000000;
-    let min_deposit_1 = 100000000000000000;
-    let max_deposit_1 = 10000000000000000000;
-    let min_withdraw_1 = 200000000000000000;
-    let max_withdraw_1 = 2000000000000000000000000;
+    let tvl_limit = 10000000000000000000;
     let withdrawal_epoch_delay_1 = 2;
     let dust_limit_1 = 1000000000000000000;
     let name_1 = 10;
@@ -374,10 +339,7 @@ fn deploy_two_strategy() -> (
             name_1,
             symbol_1,
             performance_fees_strategy_1,
-            min_deposit_1,
-            max_deposit_1,
-            min_withdraw_1,
-            max_withdraw_1,
+            tvl_limit,
             withdrawal_epoch_delay_1,
             dust_limit_1
         );
@@ -388,10 +350,7 @@ fn deploy_two_strategy() -> (
             name_1,
             symbol_1,
             performance_fees_strategy_1,
-            min_deposit_1,
-            max_deposit_1,
-            min_withdraw_1,
-            max_withdraw_1,
+            tvl_limit,
             withdrawal_epoch_delay_1,
             dust_limit_1
         );
@@ -434,10 +393,7 @@ fn deploy_three_strategy() -> (
     let l1_strategy_3: EthAddress = 4.try_into().unwrap();
 
     let performance_fees_strategy_1 = 200000000000000000;
-    let min_deposit_1 = 100000000000000000;
-    let max_deposit_1 = 10000000000000000000;
-    let min_withdraw_1 = 200000000000000000;
-    let max_withdraw_1 = 2000000000000000000000000;
+    let tvl_limit = 10000000000000000000;
     let withdrawal_epoch_delay_1 = 2;
     let dust_limit_1 = 1000000000000000000;
     let name_1 = 10;
@@ -451,10 +407,7 @@ fn deploy_three_strategy() -> (
             name_1,
             symbol_1,
             performance_fees_strategy_1,
-            min_deposit_1,
-            max_deposit_1,
-            min_withdraw_1,
-            max_withdraw_1,
+            tvl_limit,
             withdrawal_epoch_delay_1,
             dust_limit_1
         );
@@ -465,10 +418,7 @@ fn deploy_three_strategy() -> (
             name_1,
             symbol_1,
             performance_fees_strategy_1,
-            min_deposit_1,
-            max_deposit_1,
-            min_withdraw_1,
-            max_withdraw_1,
+            tvl_limit,
             withdrawal_epoch_delay_1,
             dust_limit_1
         );
@@ -480,10 +430,7 @@ fn deploy_three_strategy() -> (
             name_1,
             symbol_1,
             performance_fees_strategy_1,
-            min_deposit_1,
-            max_deposit_1,
-            min_withdraw_1,
-            max_withdraw_1,
+            tvl_limit,
             withdrawal_epoch_delay_1,
             dust_limit_1
         );
@@ -581,10 +528,9 @@ fn deposit_and_handle_mass(
 
     let assets: u256 = match assets {
         Option::Some(n) => {
-            let min_deposit = token_manager.deposit_limit_low();
-            let max_deposit = token_manager.deposit_limit_high();
+            let tvl_limit = token_manager.tvl_limit();
 
-            between(min_deposit, max_deposit, n)
+            between(1, tvl_limit, n)
         },
         Option::None => 200000000000000000
     };

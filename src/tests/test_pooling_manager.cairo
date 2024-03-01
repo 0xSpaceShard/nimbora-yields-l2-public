@@ -857,7 +857,7 @@ mod testPoolingManager {
     #[should_panic(expected: ('Invalid caller',))]
     fn register_strategy_wrong_caller() {
         let (token_manager, token, pooling_manager, _) = deploy_strategy();
-        pooling_manager.register_strategy(token_manager, token, 1.try_into().unwrap(), token_manager, 1, 1, 100, 1, 50);
+        pooling_manager.register_strategy(token_manager, token, 1.try_into().unwrap(), token_manager, 1, 100);
     }
 
     #[test]
@@ -880,10 +880,7 @@ mod testPoolingManager {
         );
         let l1_strategy_1: EthAddress = 2.try_into().unwrap();
         let performance_fees_strategy_1 = 200000000000000000;
-        let min_deposit_1 = 100000000000000000;
-        let max_deposit_1 = 10000000000000000000;
-        let min_withdraw_1 = 200000000000000000;
-        let max_withdraw_1 = 2000000000000000000000000;
+        let tvl_limit = 100000000000000000;
         let withdrawal_epoch_delay_1 = 2;
         let dust_limit_1 = 1000000000000000000;
         let name_1 = 10;
@@ -897,10 +894,7 @@ mod testPoolingManager {
                 name_1,
                 symbol_1,
                 performance_fees_strategy_1,
-                min_deposit_1,
-                max_deposit_1,
-                min_withdraw_1,
-                max_withdraw_1,
+                tvl_limit,
                 withdrawal_epoch_delay_1,
                 dust_limit_1
             );
@@ -914,10 +908,7 @@ mod testPoolingManager {
                 l1_strategy_1,
                 Zeroable::zero(),
                 performance_fees_strategy_1,
-                min_deposit_1,
-                max_deposit_1,
-                min_withdraw_1,
-                max_withdraw_1,
+                tvl_limit,
             );
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
     }
@@ -942,10 +933,7 @@ mod testPoolingManager {
         );
         let l1_strategy_1: EthAddress = 2.try_into().unwrap();
         let performance_fees_strategy_1 = 200000000000000000;
-        let min_deposit_1 = 100000000000000000;
-        let max_deposit_1 = 10000000000000000000;
-        let min_withdraw_1 = 200000000000000000;
-        let max_withdraw_1 = 2000000000000000000000000;
+        let tvl_limit = 10000000000000000000;
         let withdrawal_epoch_delay_1 = 2;
         let dust_limit_1 = 1000000000000000000;
         let name_1 = 10;
@@ -959,10 +947,7 @@ mod testPoolingManager {
                 name_1,
                 symbol_1,
                 performance_fees_strategy_1,
-                min_deposit_1,
-                max_deposit_1,
-                min_withdraw_1,
-                max_withdraw_1,
+                tvl_limit,
                 withdrawal_epoch_delay_1,
                 dust_limit_1
             );
@@ -976,10 +961,7 @@ mod testPoolingManager {
                 l1_strategy_1,
                 token_1.contract_address,
                 performance_fees_strategy_1,
-                min_deposit_1,
-                max_deposit_1,
-                min_withdraw_1,
-                max_withdraw_1,
+                tvl_limit,
             );
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
     }
@@ -1005,11 +987,11 @@ mod testPoolingManager {
 
     #[test]
     #[should_panic(expected: ('Invalid caller',))]
-    fn emit_deposit_limit_updated_event_wrong_caller() {
+    fn emit_tvl_limit_updated_event_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
 
-        pooling_manager.emit_deposit_limit_updated_event(l1_pooling_manager, 100, 200);
+        pooling_manager.emit_tvl_limit_updated_event(l1_pooling_manager, 100);
     }
 
     #[test]
@@ -1019,12 +1001,12 @@ mod testPoolingManager {
         let mut spy = spy_events(SpyOn::One(pooling_manager.contract_address));
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), token_manager);
-        pooling_manager.emit_deposit_limit_updated_event(l1_strategy, 100, 200);
+        pooling_manager.emit_tvl_limit_updated_event(l1_strategy, 200);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         spy.fetch_events();
         let (_, event) = spy.events.at(0);
-        assert(event.keys.at(0) == @event_name_hash('DepositLimitUpdated'), 'Event was not emitted');
+        assert(event.keys.at(0) == @event_name_hash('TvlLimitUpdated'), 'Event was not emitted');
     }
 
     #[test]
