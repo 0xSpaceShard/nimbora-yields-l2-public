@@ -990,8 +990,8 @@ mod testPoolingManager {
     fn emit_tvl_limit_updated_event_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
-
-        pooling_manager.emit_tvl_limit_updated_event(l1_pooling_manager, 100);
+        let l2_strategy = contract_address_const::<230>();
+        pooling_manager.emit_tvl_limit_updated_event(l1_pooling_manager, l2_strategy, 100);
     }
 
     #[test]
@@ -1001,7 +1001,7 @@ mod testPoolingManager {
         let mut spy = spy_events(SpyOn::One(pooling_manager.contract_address));
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), token_manager);
-        pooling_manager.emit_tvl_limit_updated_event(l1_strategy, 200);
+        pooling_manager.emit_tvl_limit_updated_event(l1_strategy, token_manager, 200);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         spy.fetch_events();
@@ -1014,8 +1014,8 @@ mod testPoolingManager {
     fn emit_performance_fees_updated_event_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
-
-        pooling_manager.emit_performance_fees_updated_event(l1_pooling_manager, 100);
+        let l2_strategy = contract_address_const::<230>();
+        pooling_manager.emit_performance_fees_updated_event(l1_pooling_manager, l2_strategy, 100);
     }
 
     #[test]
@@ -1025,7 +1025,7 @@ mod testPoolingManager {
         let mut spy = spy_events(SpyOn::One(pooling_manager.contract_address));
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), token_manager);
-        pooling_manager.emit_performance_fees_updated_event(l1_strategy, 100);
+        pooling_manager.emit_performance_fees_updated_event(l1_strategy, token_manager, 100);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         spy.fetch_events();
@@ -1038,8 +1038,8 @@ mod testPoolingManager {
     fn emit_deposit_event_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
-
-        pooling_manager.emit_deposit_event(l1_pooling_manager, owner, owner, 100, 200, owner);
+        let l2_strategy = contract_address_const::<230>();
+        pooling_manager.emit_deposit_event(l1_pooling_manager, l2_strategy, owner, owner, 100, 200, owner);
     }
 
     #[test]
@@ -1049,7 +1049,7 @@ mod testPoolingManager {
         let mut spy = spy_events(SpyOn::One(pooling_manager.contract_address));
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), token_manager);
-        pooling_manager.emit_deposit_event(l1_strategy, owner, owner, 100, 200, owner);
+        pooling_manager.emit_deposit_event(l1_strategy, token_manager, owner, owner, 100, 200, owner);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         spy.fetch_events();
@@ -1062,8 +1062,8 @@ mod testPoolingManager {
     fn emit_request_withdrawal_event_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
-
-        pooling_manager.emit_request_withdrawal_event(l1_pooling_manager, owner, 100, 200, 1, 1);
+        let l2_strategy = contract_address_const::<230>();
+        pooling_manager.emit_request_withdrawal_event(l1_pooling_manager, l2_strategy, owner, 100, 200, 1, 1);
     }
 
     #[test]
@@ -1073,7 +1073,7 @@ mod testPoolingManager {
         let mut spy = spy_events(SpyOn::One(pooling_manager.contract_address));
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), token_manager);
-        pooling_manager.emit_request_withdrawal_event(l1_strategy, owner, 100, 200, 1, 1);
+        pooling_manager.emit_request_withdrawal_event(l1_strategy, token_manager, owner, 100, 200, 1, 1);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         spy.fetch_events();
@@ -1086,8 +1086,9 @@ mod testPoolingManager {
     fn emit_claim_withdrawal_event_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
+        let l2_strategy = contract_address_const::<230>();
 
-        pooling_manager.emit_claim_withdrawal_event(l1_pooling_manager, owner, 1, 200);
+        pooling_manager.emit_claim_withdrawal_event(l1_pooling_manager, l2_strategy, owner, 1, 200);
     }
 
     #[test]
@@ -1097,7 +1098,7 @@ mod testPoolingManager {
         let mut spy = spy_events(SpyOn::One(pooling_manager.contract_address));
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), token_manager);
-        pooling_manager.emit_claim_withdrawal_event(l1_strategy, owner, 1, 200);
+        pooling_manager.emit_claim_withdrawal_event(l1_strategy, token_manager, owner, 1, 200);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         spy.fetch_events();
@@ -1110,8 +1111,9 @@ mod testPoolingManager {
     fn emit_withdrawal_epoch_delay_updated_event_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
+        let l2_strategy = contract_address_const::<230>();
 
-        pooling_manager.emit_withdrawal_epoch_delay_updated_event(l1_pooling_manager, 100);
+        pooling_manager.emit_withdrawal_epoch_delay_updated_event(l1_pooling_manager, l2_strategy, 100);
     }
 
     #[test]
@@ -1121,7 +1123,7 @@ mod testPoolingManager {
         let mut spy = spy_events(SpyOn::One(pooling_manager.contract_address));
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), token_manager);
-        pooling_manager.emit_withdrawal_epoch_delay_updated_event(l1_strategy, 100);
+        pooling_manager.emit_withdrawal_epoch_delay_updated_event(l1_strategy, token_manager, 100);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         spy.fetch_events();

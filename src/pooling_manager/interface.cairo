@@ -60,19 +60,25 @@ trait IPoolingManager<TContractState> {
         ref self: TContractState, underlying: ContractAddress, bridge: ContractAddress, l1_bridge: felt252,
     );
 
-    fn emit_tvl_limit_updated_event(ref self: TContractState, l1_strategy: EthAddress, new_tvl_limit: u256);
+    fn emit_tvl_limit_updated_event(
+        ref self: TContractState, l1_strategy: EthAddress, l2_strategy: ContractAddress, new_tvl_limit: u256
+    );
 
     fn emit_performance_fees_updated_event(
-        ref self: TContractState, l1_strategy: EthAddress, new_performance_fees: u256
+        ref self: TContractState, l1_strategy: EthAddress, l2_strategy: ContractAddress, new_performance_fees: u256
     );
     fn emit_withdrawal_epoch_delay_updated_event(
-        ref self: TContractState, l1_strategy: EthAddress, new_withdrawal_epoch_delay: u256
+        ref self: TContractState,
+        l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
+        new_withdrawal_epoch_delay: u256
     );
 
     fn emit_dust_limit_updated_event(ref self: TContractState, l1_strategy: EthAddress, new_dust_limit: u256);
     fn emit_deposit_event(
         ref self: TContractState,
         l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
         caller: ContractAddress,
         receiver: ContractAddress,
         assets: u256,
@@ -82,6 +88,7 @@ trait IPoolingManager<TContractState> {
     fn emit_request_withdrawal_event(
         ref self: TContractState,
         l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
         caller: ContractAddress,
         assets: u256,
         shares: u256,
@@ -90,7 +97,12 @@ trait IPoolingManager<TContractState> {
     );
 
     fn emit_claim_withdrawal_event(
-        ref self: TContractState, l1_strategy: EthAddress, caller: ContractAddress, id: u256, underlying_amount: u256
+        ref self: TContractState,
+        l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
+        caller: ContractAddress,
+        id: u256,
+        underlying_amount: u256
     );
 
     fn emit_token_manager_class_hash_updated_event(ref self: TContractState, new_token_manager_class_hash: ClassHash);

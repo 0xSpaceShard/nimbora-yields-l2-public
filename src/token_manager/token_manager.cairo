@@ -59,6 +59,7 @@ mod TokenManager {
         const ZERO_AMOUNT: felt252 = 'Amount nul';
         const ZERO_ADDRESS: felt252 = 'Address is zero';
         const TVL_LIMIT: felt252 = 'Tvl limit reached';
+        const INVALID_TVL_LIMIT: felt252 = 'Tvl limit reached';
         const NOT_OWNER: felt252 = 'Not owner';
         const WITHDRAWAL_NOT_REDY: felt252 = 'Withdrawal not ready';
         const ALREADY_CLAIMED: felt252 = 'Already claimed';
@@ -254,9 +255,10 @@ mod TokenManager {
             self._assert_only_owner();
             self._set_performance_fees(new_performance_fees);
             let l1_strategy = self.l1_strategy.read();
+            let l2_strategy = get_contract_address();
             let pooling_manager = self.pooling_manager.read();
             let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
-            pooling_manager_disp.emit_performance_fees_updated_event(l1_strategy, new_performance_fees);
+            pooling_manager_disp.emit_performance_fees_updated_event(l1_strategy, l2_strategy, new_performance_fees);
         }
 
         /// @notice Sets new tvl limits
@@ -266,9 +268,10 @@ mod TokenManager {
             self._assert_only_owner();
             self._set_tvl_limit(new_tvl_limit);
             let l1_strategy = self.l1_strategy.read();
+            let l2_strategy = get_contract_address();
             let pooling_manager = self.pooling_manager.read();
             let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
-            pooling_manager_disp.emit_tvl_limit_updated_event(l1_strategy, new_tvl_limit);
+            pooling_manager_disp.emit_tvl_limit_updated_event(l1_strategy, l2_strategy, new_tvl_limit);
         }
 
         /// @notice Sets a new withdrawal epoch delay
@@ -278,9 +281,11 @@ mod TokenManager {
             self._assert_only_owner();
             self._set_withdrawal_epoch_delay(new_withdrawal_epoch_delay);
             let l1_strategy = self.l1_strategy.read();
+            let l2_strategy = get_contract_address();
             let pooling_manager = self.pooling_manager.read();
             let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
-            pooling_manager_disp.emit_withdrawal_epoch_delay_updated_event(l1_strategy, new_withdrawal_epoch_delay);
+            pooling_manager_disp
+                .emit_withdrawal_epoch_delay_updated_event(l1_strategy, l2_strategy, new_withdrawal_epoch_delay);
         }
 
         /// @notice Sets a new dust limit
@@ -303,11 +308,6 @@ mod TokenManager {
         /// @param referal The referral address for the deposit
         fn deposit(ref self: ContractState, assets: u256, receiver: ContractAddress, referal: ContractAddress) {
             assert(assets + self._total_assets() <= self.tvl_limit.read(), Errors::TVL_LIMIT);
-            // let deposit_limit_low = self.deposit_limit_low.read();
-            // let deposit_limit_high = self.deposit_limit_high.read();
-
-            // assert(assets >= deposit_limit_low, Errors::LOW_LIMIT);
-            // assert(assets <= deposit_limit_high, Errors::HIGH_LIMIT);
 
             let underlying = self.underlying.read();
             let erc20_disp = ERC20ABIDispatcher { contract_address: underlying };
@@ -328,7 +328,7 @@ mod TokenManager {
             let l1_strategy = self.l1_strategy.read();
             let pooling_manager = self.pooling_manager.read();
             let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
-            pooling_manager_disp.emit_deposit_event(l1_strategy, caller, receiver, assets, shares, referal);
+            pooling_manager_disp.emit_deposit_event(l1_strategy, this, caller, receiver, assets, shares, referal);
         }
 
         /// @notice Allows a user to request a withdrawal from the contract
@@ -359,10 +359,13 @@ mod TokenManager {
             self.user_withdrawal_len.write(caller, user_withdrawal_len + 1);
 
             let l1_strategy = self.l1_strategy.read();
+            let l2_strategy = get_contract_address();
             let pooling_manager = self.pooling_manager.read();
             let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
             pooling_manager_disp
-                .emit_request_withdrawal_event(l1_strategy, caller, assets, shares, user_withdrawal_len, epoch);
+                .emit_request_withdrawal_event(
+                    l1_strategy, l2_strategy, caller, assets, shares, user_withdrawal_len, epoch
+                );
         }
 
 
@@ -398,9 +401,10 @@ mod TokenManager {
             underlying_disp.transfer(caller, assets);
 
             let l1_strategy = self.l1_strategy.read();
+            let l2_strategy = get_contract_address();
             let pooling_manager = self.pooling_manager.read();
             let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
-            pooling_manager_disp.emit_claim_withdrawal_event(l1_strategy, caller, id, assets);
+            pooling_manager_disp.emit_claim_withdrawal_event(l1_strategy, l2_strategy, caller, id, assets);
         }
 
         /// @notice Handles the report from the L1 strategy
@@ -545,6 +549,7 @@ mod TokenManager {
         /// @param new_tvl_limit The new limit for tvl
         fn _set_tvl_limit(ref self: ContractState, new_tvl_limit: u256) {
             assert(new_tvl_limit.is_non_zero(), Errors::ZERO_AMOUNT);
+            assert(self._total_assets() < new_tvl_limit, Errors::INVALID_TVL_LIMIT);
             self.tvl_limit.write(new_tvl_limit);
         }
 

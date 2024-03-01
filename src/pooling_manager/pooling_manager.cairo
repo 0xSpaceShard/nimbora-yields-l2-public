@@ -134,18 +134,21 @@ mod PoolingManager {
     #[derive(Drop, starknet::Event)]
     struct TvlLimitUpdated {
         l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
         new_tvl_limit: u256,
     }
 
     #[derive(Drop, starknet::Event)]
     struct PerformanceFeesUpdated {
         l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
         new_performance_fees: u256
     }
 
     #[derive(Drop, starknet::Event)]
     struct WithdrawalEpochUpdated {
         l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
         new_withdrawal_epoch_delay: u256
     }
 
@@ -159,6 +162,7 @@ mod PoolingManager {
     #[derive(Drop, starknet::Event)]
     struct Deposit {
         l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
         caller: ContractAddress,
         receiver: ContractAddress,
         assets: u256,
@@ -170,6 +174,7 @@ mod PoolingManager {
     #[derive(Drop, starknet::Event)]
     struct RequestWithdrawal {
         l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
         caller: ContractAddress,
         assets: u256,
         shares: u256,
@@ -180,6 +185,7 @@ mod PoolingManager {
     #[derive(Drop, starknet::Event)]
     struct ClaimWithdrawal {
         l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
         caller: ContractAddress,
         id: u256,
         underlying_amount: u256
@@ -627,9 +633,14 @@ mod PoolingManager {
         /// @dev Only callable by a registered token manager
         /// @param l1_strategy The Ethereum address of the L1 strategy for which limits are updated
         /// @param new_tvl_limit The updated tvl limit
-        fn emit_tvl_limit_updated_event(ref self: ContractState, l1_strategy: EthAddress, new_tvl_limit: u256) {
+        fn emit_tvl_limit_updated_event(
+            ref self: ContractState, l1_strategy: EthAddress, l2_strategy: ContractAddress, new_tvl_limit: u256
+        ) {
             self._assert_caller_is_registered_token_manager(l1_strategy);
-            self.emit(TvlLimitUpdated { l1_strategy: l1_strategy, new_tvl_limit: new_tvl_limit });
+            self
+                .emit(
+                    TvlLimitUpdated { l1_strategy: l1_strategy, l2_strategy: l2_strategy, new_tvl_limit: new_tvl_limit }
+                );
         }
 
         /// @notice Emits an event when performance fees are updated for a strategy
@@ -637,10 +648,15 @@ mod PoolingManager {
         /// @param l1_strategy The Ethereum address of the L1 strategy
         /// @param new_performance_fees The updated performance fees
         fn emit_performance_fees_updated_event(
-            ref self: ContractState, l1_strategy: EthAddress, new_performance_fees: u256
+            ref self: ContractState, l1_strategy: EthAddress, l2_strategy: ContractAddress, new_performance_fees: u256
         ) {
             self._assert_caller_is_registered_token_manager(l1_strategy);
-            self.emit(PerformanceFeesUpdated { l1_strategy: l1_strategy, new_performance_fees: new_performance_fees });
+            self
+                .emit(
+                    PerformanceFeesUpdated {
+                        l1_strategy: l1_strategy, l2_strategy: l2_strategy, new_performance_fees: new_performance_fees
+                    }
+                );
         }
 
 
@@ -655,6 +671,7 @@ mod PoolingManager {
         fn emit_deposit_event(
             ref self: ContractState,
             l1_strategy: EthAddress,
+            l2_strategy: ContractAddress,
             caller: ContractAddress,
             receiver: ContractAddress,
             assets: u256,
@@ -666,6 +683,7 @@ mod PoolingManager {
                 .emit(
                     Deposit {
                         l1_strategy: l1_strategy,
+                        l2_strategy: l2_strategy,
                         caller: caller,
                         receiver: receiver,
                         assets: assets,
@@ -686,6 +704,7 @@ mod PoolingManager {
         fn emit_request_withdrawal_event(
             ref self: ContractState,
             l1_strategy: EthAddress,
+            l2_strategy: ContractAddress,
             caller: ContractAddress,
             assets: u256,
             shares: u256,
@@ -696,7 +715,13 @@ mod PoolingManager {
             self
                 .emit(
                     RequestWithdrawal {
-                        l1_strategy: l1_strategy, caller: caller, assets: assets, shares: shares, id: id, epoch: epoch
+                        l1_strategy: l1_strategy,
+                        l2_strategy: l2_strategy,
+                        caller: caller,
+                        assets: assets,
+                        shares: shares,
+                        id: id,
+                        epoch: epoch
                     }
                 );
         }
@@ -708,13 +733,22 @@ mod PoolingManager {
         /// @param id The unique identifier of the withdrawal for a user
         /// @param underlying_amount The amount of underlying asset withdrawn
         fn emit_claim_withdrawal_event(
-            ref self: ContractState, l1_strategy: EthAddress, caller: ContractAddress, id: u256, underlying_amount: u256
+            ref self: ContractState,
+            l1_strategy: EthAddress,
+            l2_strategy: ContractAddress,
+            caller: ContractAddress,
+            id: u256,
+            underlying_amount: u256
         ) {
             self._assert_caller_is_registered_token_manager(l1_strategy);
             self
                 .emit(
                     ClaimWithdrawal {
-                        l1_strategy: l1_strategy, caller: caller, id: id, underlying_amount: underlying_amount
+                        l1_strategy: l1_strategy,
+                        l2_strategy: l2_strategy,
+                        caller: caller,
+                        id: id,
+                        underlying_amount: underlying_amount
                     }
                 );
         }
@@ -724,13 +758,18 @@ mod PoolingManager {
         /// @param l1_strategy The Ethereum address of the L1 strategy
         /// @param new_withdrawal_epoch_delay The updated withdrawal epoch delay
         fn emit_withdrawal_epoch_delay_updated_event(
-            ref self: ContractState, l1_strategy: EthAddress, new_withdrawal_epoch_delay: u256
+            ref self: ContractState,
+            l1_strategy: EthAddress,
+            l2_strategy: ContractAddress,
+            new_withdrawal_epoch_delay: u256
         ) {
             self._assert_caller_is_registered_token_manager(l1_strategy);
             self
                 .emit(
                     WithdrawalEpochUpdated {
-                        l1_strategy: l1_strategy, new_withdrawal_epoch_delay: new_withdrawal_epoch_delay
+                        l1_strategy: l1_strategy,
+                        l2_strategy: l2_strategy,
+                        new_withdrawal_epoch_delay: new_withdrawal_epoch_delay
                     }
                 );
         }
