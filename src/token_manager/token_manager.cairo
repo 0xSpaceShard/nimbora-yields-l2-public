@@ -372,11 +372,10 @@ mod TokenManager {
         /// @notice Allows a user to claim a withdrawal
         /// @dev Validates that the withdrawal is ready to be claimed and processes it
         /// @param id The unique identifier of the withdrawal request
-        fn claim_withdrawal(ref self: ContractState, id: u256) {
-            let caller = get_caller_address();
-            let user_withdrawal_len = self.user_withdrawal_len(caller);
+        fn claim_withdrawal(ref self: ContractState, user: ContractAddress, id: u256) {
+            let user_withdrawal_len = self.user_withdrawal_len(user);
             assert(user_withdrawal_len > id, Errors::INVALID_ID);
-            let withdrawal_info = self.withdrawal_info.read((caller, id));
+            let withdrawal_info = self.withdrawal_info.read((user, id));
             assert(!withdrawal_info.claimed, Errors::ALREADY_CLAIMED);
             let handled_epoch_withdrawal_len = self.handled_epoch_withdrawal_len.read();
             assert(handled_epoch_withdrawal_len > withdrawal_info.epoch, Errors::WITHDRAWAL_NOT_REDY);
@@ -384,7 +383,7 @@ mod TokenManager {
             self
                 .withdrawal_info
                 .write(
-                    (caller, id),
+                    (user, id),
                     WithdrawalInfo { shares: withdrawal_info.shares, epoch: withdrawal_info.epoch, claimed: true }
                 );
 
@@ -398,13 +397,13 @@ mod TokenManager {
 
             let underlying = self.underlying.read();
             let underlying_disp = ERC20ABIDispatcher { contract_address: underlying };
-            underlying_disp.transfer(caller, assets);
+            underlying_disp.transfer(user, assets);
 
             let l1_strategy = self.l1_strategy.read();
             let l2_strategy = get_contract_address();
             let pooling_manager = self.pooling_manager.read();
             let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
-            pooling_manager_disp.emit_claim_withdrawal_event(l1_strategy, l2_strategy, caller, id, assets);
+            pooling_manager_disp.emit_claim_withdrawal_event(l1_strategy, l2_strategy, user, id, assets);
         }
 
         /// @notice Handles the report from the L1 strategy

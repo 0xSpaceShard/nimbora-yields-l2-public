@@ -65,7 +65,7 @@ trait ITokenManager<TContractState> {
 
     fn request_withdrawal(ref self: TContractState, shares: u256);
 
-    fn claim_withdrawal(ref self: TContractState, id: u256);
+    fn claim_withdrawal(ref self: TContractState, user: ContractAddress, id: u256);
 
     fn handle_report(
         ref self: TContractState, new_l1_net_asset_value: u256, underlying_bridged_amount: u256

@@ -733,7 +733,7 @@ mod testTokenManager {
         let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
 
         start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.claim_withdrawal(id);
+        token_manager.claim_withdrawal(owner, id);
         stop_prank(CheatTarget::One(token_manager.contract_address));
     }
 
@@ -762,7 +762,7 @@ mod testTokenManager {
         let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
 
         start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.claim_withdrawal(id);
+        token_manager.claim_withdrawal(owner, id);
         stop_prank(CheatTarget::One(token_manager.contract_address));
     }
 
@@ -803,7 +803,7 @@ mod testTokenManager {
         let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
 
         start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.claim_withdrawal(id);
+        token_manager.claim_withdrawal(owner, id);
         stop_prank(CheatTarget::One(token_manager.contract_address));
     }
 
@@ -878,7 +878,7 @@ mod testTokenManager {
         let previous_owner_balance = underlying_disp.balanceOf(owner);
 
         start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.claim_withdrawal(id);
+        token_manager.claim_withdrawal(owner, id);
         stop_prank(CheatTarget::One(token_manager.contract_address));
 
         let new_withdrawal_pool = token_manager.withdrawal_pool(withdrawal_user_epoch);
