@@ -245,6 +245,13 @@ mod PoolingManager {
         self.pending_strategies_to_initialize_len.write(len);
     }
 
+    #[external(v0)]
+    fn set_hash(ref self: ContractState, epoch_id: u256, hash: u256) {
+        self.accesscontrol.assert_only_role(0);
+        self.l1_report_hash.write(epoch_id, hash);
+        self.emit(NewL1ReportHash { new_l1_report_hash: hash })
+    }
+
     fn reverse_endianness(value: u256) -> u256 {
         let new_low = u128_byte_reverse(value.high);
         let new_high = u128_byte_reverse(value.low);
