@@ -506,7 +506,6 @@ mod PoolingManager {
                     break ();
                 }
 
-
                 let elem = *full_strategy_report_l1.at(i);
                 let strategy = self.l1_strategy_to_token_manager.read(elem.l1_strategy);
                 let strategy_disp = ITokenManagerDispatcher { contract_address: strategy };
@@ -567,7 +566,6 @@ mod PoolingManager {
                         bridge_withdrawal_amount.insert(bridge.into(), new_amount);
                     }
                 }
-                
                 strategy_report_l2_array.append(ret);
                 i += 1;
             };
@@ -923,7 +921,11 @@ mod PoolingManager {
                 ret_array.append(l1_strategy_u256);
                 ret_array.append(strategy_report_l2_elem.action_id);
                 ret_array.append(strategy_report_l2_elem.amount);
+                if(strategy_report_l2_elem.processed){
                 ret_array.append(1);
+                } else {
+                ret_array.append(0);
+                }
                 i += 1;
             };
 
