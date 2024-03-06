@@ -252,6 +252,15 @@ mod PoolingManager {
         self.emit(NewL1ReportHash { new_l1_report_hash: hash })
     }
 
+    #[external(v0)]
+    fn send_message_to_l1_admin(ref self: ContractState, hash: u256) {
+        let l1_pooling_manager = self.l1_pooling_manager.read();
+        let mut message_payload: Array<felt252> = ArrayTrait::new();
+        message_payload.append(hash.low.into());
+        message_payload.append(hash.high.into());
+        send_message_to_l1_syscall(to_address: l1_pooling_manager.into(), payload: message_payload.span());
+    }
+
     fn reverse_endianness(value: u256) -> u256 {
         let new_low = u128_byte_reverse(value.high);
         let new_high = u128_byte_reverse(value.low);
