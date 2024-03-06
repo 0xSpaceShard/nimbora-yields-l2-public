@@ -584,11 +584,11 @@ mod testPoolingManager {
         };
 
         let strategy_report_1 = StrategyReportL2 {
-            l1_strategy: 1.try_into().unwrap(), action_id: 15, amount: 10000, new_share_price: 50000000000000,
+            l1_strategy: 1.try_into().unwrap(), action_id: 15, amount: 10000, processed: false, new_share_price: 50000000000000
         };
 
         let strategy_report_2 = StrategyReportL2 {
-            l1_strategy: 2.try_into().unwrap(), action_id: 1, amount: 510000, new_share_price: 50000000000000,
+            l1_strategy: 2.try_into().unwrap(), action_id: 1, amount: 510000, processed: false, new_share_price: 50000000000000
         };
 
         let bridge_withdrawal_info_1 = BridgeInteractionInfo {
@@ -628,7 +628,7 @@ mod testPoolingManager {
         let new_share_price: u256 = between(50000000000000, 5000000000000000000000000, z);
 
         let strategy_report = StrategyReportL2 {
-            l1_strategy: 2.try_into().unwrap(), action_id: 1, amount: 10000, new_share_price: new_share_price,
+            l1_strategy: 2.try_into().unwrap(), action_id: 1, amount: 10000, processed: false, new_share_price: new_share_price
         };
 
         let bridge_withdrawal_info = BridgeInteractionInfo {
@@ -676,7 +676,7 @@ mod testPoolingManager {
         let new_share_price: u256 = between(50000000000000, 5000000000000000000000000, z);
 
         let strategy_report = StrategyReportL2 {
-            l1_strategy: 2.try_into().unwrap(), action_id: 1, amount: 10000, new_share_price: new_share_price,
+            l1_strategy: 2.try_into().unwrap(), action_id: 1, amount: 10000, processed: false, new_share_price: new_share_price,
         };
         let bridge_deposit_info = BridgeInteractionInfo { l1_bridge: 1.try_into().unwrap(), amount: deposit_amount };
 

@@ -1,4 +1,4 @@
-use starknet::{ContractAddress, ClassHash, eth_address::EthAddress};
+use starknet::{ContractAddress, ClassHash, eth_address::EthAddress, Zeroable};
 
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -16,14 +16,35 @@ impl WithdrawalInfoIntoSpan of Into<WithdrawalInfo, Span<felt252>> {
     }
 }
 
-#[derive(Copy, Drop, Serde)]
+#[derive(Copy, Drop, Serde, PartialEq)]
 struct StrategyReportL2 {
     l1_strategy: EthAddress,
     action_id: u256,
     amount: u256,
+    processed: bool,
     new_share_price: u256
 }
 
+impl StrategyReportL2Zeroable of Zeroable<StrategyReportL2> {
+    fn zero() -> StrategyReportL2 {
+        StrategyReportL2{
+            l1_strategy: Zeroable::zero(),
+            action_id: Zeroable::zero(),
+            amount: Zeroable::zero(),
+            processed: false,
+            new_share_price: Zeroable::zero()
+        }
+    }
+
+    #[inline(always)]
+    fn is_zero(self: StrategyReportL2) -> bool {
+        self == StrategyReportL2Zeroable::zero()
+    }
+    #[inline(always)]
+    fn is_non_zero(self: StrategyReportL2) -> bool {
+        self != StrategyReportL2Zeroable::zero()
+    }
+}
 
 #[starknet::interface]
 trait ITokenManager<TContractState> {

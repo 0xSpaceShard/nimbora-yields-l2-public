@@ -440,6 +440,7 @@ mod TokenManager {
                 l1_strategy: self.l1_strategy.read(),
                 action_id: action_id,
                 amount: amount,
+                processed: true,
                 new_share_price: new_share_price
             }
         }

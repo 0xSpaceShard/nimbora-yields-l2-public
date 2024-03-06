@@ -7,7 +7,7 @@ mod PoolingManager {
     use nimbora_yields::pooling_manager::interface::{IPoolingManager, StrategyReportL1, BridgeInteractionInfo};
     use nimbora_yields::token_bridge::interface::{ITokenBridgeDispatcher, ITokenBridgeDispatcherTrait};
     use nimbora_yields::token_manager::interface::{
-        ITokenManagerDispatcher, ITokenManagerDispatcherTrait, StrategyReportL2
+        ITokenManagerDispatcher, ITokenManagerDispatcherTrait, StrategyReportL2, StrategyReportL2Zeroable
     };
     use nimbora_yields::utils::{CONSTANTS, MATH};
 
@@ -496,45 +496,47 @@ mod PoolingManager {
                 if (i == array_len) {
                     break ();
                 }
+
+
                 let elem = *full_strategy_report_l1.at(i);
-                if (!elem.processed) {
-                    strategy_report_l2_array
-                        .append(
-                            StrategyReportL2 {
-                                l1_strategy: elem.l1_strategy,
-                                action_id: elem.l1_net_asset_value,
-                                amount: elem.underlying_bridged_amount,
-                                new_share_price: 0
-                            }
-                        );
-                    i += 1;
-                    continue;
-                }
                 let strategy = self.l1_strategy_to_token_manager.read(elem.l1_strategy);
                 let strategy_disp = ITokenManagerDispatcher { contract_address: strategy };
                 let underlying = strategy_disp.underlying();
                 let underlying_disp = ERC20ABIDispatcher { contract_address: underlying };
-                if (elem.underlying_bridged_amount.is_non_zero()) {
-                    underlying_disp.transfer(strategy, elem.underlying_bridged_amount);
-                }
-                let ret = strategy_disp.handle_report(elem.l1_net_asset_value, elem.underlying_bridged_amount);
-                strategy_report_l2_array.append(ret);
 
-                if (ret.action_id == CONSTANTS::DEPOSIT) {
-                    let bridge = self.underlying_to_bridge.read(underlying);
-                    let val = bridge_deposit_amount.get(bridge.into());
 
-                    let current_bridge_deposit_amount: u256 = match match_nullable(val) {
-                        FromNullableResult::Null => 0,
-                        FromNullableResult::NotNull(val) => val.unbox(),
-                    };
-                    if (current_bridge_deposit_amount.is_zero()) {
-                        let new_amount = nullable_from_box(BoxTrait::new(ret.amount));
-                        dict_bridge_deposit_keys.append(bridge);
-                        bridge_deposit_amount.insert(bridge.into(), new_amount);
-                    } else {
-                        let new_amount = nullable_from_box(BoxTrait::new(ret.amount + current_bridge_deposit_amount));
-                        bridge_deposit_amount.insert(bridge.into(), new_amount);
+                let mut ret : StrategyReportL2 = Zeroable::zero();
+
+                if (!elem.processed) {
+                    ret = StrategyReportL2 {
+                            l1_strategy: elem.l1_strategy,
+                            action_id: elem.l1_net_asset_value,
+                            amount: elem.underlying_bridged_amount,
+                            processed: false,
+                            new_share_price: 0
+                        }
+                } else {
+                    if (elem.underlying_bridged_amount.is_non_zero()) {
+                        underlying_disp.transfer(strategy, elem.underlying_bridged_amount);
+                    }
+                    let ret = strategy_disp.handle_report(elem.l1_net_asset_value, elem.underlying_bridged_amount);
+
+                    if (ret.action_id == CONSTANTS::DEPOSIT) {
+                        let bridge = self.underlying_to_bridge.read(underlying);
+                        let val = bridge_deposit_amount.get(bridge.into());
+
+                        let current_bridge_deposit_amount: u256 = match match_nullable(val) {
+                            FromNullableResult::Null => 0,
+                            FromNullableResult::NotNull(val) => val.unbox(),
+                        };
+                        if (current_bridge_deposit_amount.is_zero()) {
+                            let new_amount = nullable_from_box(BoxTrait::new(ret.amount));
+                            dict_bridge_deposit_keys.append(bridge);
+                            bridge_deposit_amount.insert(bridge.into(), new_amount);
+                        } else {
+                            let new_amount = nullable_from_box(BoxTrait::new(ret.amount + current_bridge_deposit_amount));
+                            bridge_deposit_amount.insert(bridge.into(), new_amount);
+                        }
                     }
                 }
 
@@ -556,6 +558,8 @@ mod PoolingManager {
                         bridge_withdrawal_amount.insert(bridge.into(), new_amount);
                     }
                 }
+                
+                strategy_report_l2_array.append(ret);
                 i += 1;
             };
 
