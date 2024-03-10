@@ -254,11 +254,38 @@ mod PoolingManager {
 
     #[external(v0)]
     fn send_message_to_l1_admin(ref self: ContractState, hash: u256) {
+        self.accesscontrol.assert_only_role(0);
         let l1_pooling_manager = self.l1_pooling_manager.read();
         let mut message_payload: Array<felt252> = ArrayTrait::new();
         message_payload.append(hash.low.into());
         message_payload.append(hash.high.into());
         send_message_to_l1_syscall(to_address: l1_pooling_manager.into(), payload: message_payload.span());
+    }
+
+    #[external(v0)]
+    fn emit_event_admin(ref self: ContractState, new_epoch: u256, bridge_deposit_info: Array<BridgeInteractionInfo>,strategy_report_l2_array: Array<StrategyReportL2>, bridge_withdrawal_info: Array<BridgeInteractionInfo>) {
+        self.accesscontrol.assert_only_role(0);
+        let l1_pooling_manager = self.l1_pooling_manager.read();
+        let ret_hash = self
+            ._hash_l2_data(
+                new_epoch,
+                bridge_deposit_info.span(),
+                strategy_report_l2_array.span(),
+                bridge_withdrawal_info.span()
+            );
+        let mut message_payload: Array<felt252> = ArrayTrait::new();
+        message_payload.append(ret_hash.low.into());
+        message_payload.append(ret_hash.high.into());
+        send_message_to_l1_syscall(to_address: l1_pooling_manager.into(), payload: message_payload.span());
+        self
+            .emit(
+                NewL2Report {
+                    new_epoch: new_epoch,
+                    new_bridge_deposit: bridge_deposit_info,
+                    new_l2_report: strategy_report_l2_array,
+                    new_bridge_withdraw: bridge_withdrawal_info
+                }
+            );
     }
 
     fn reverse_endianness(value: u256) -> u256 {
@@ -527,7 +554,7 @@ mod PoolingManager {
                     if (elem.underlying_bridged_amount.is_non_zero()) {
                         underlying_disp.transfer(strategy, elem.underlying_bridged_amount);
                     }
-                    let ret = strategy_disp.handle_report(elem.l1_net_asset_value, elem.underlying_bridged_amount);
+                    ret = strategy_disp.handle_report(elem.l1_net_asset_value, elem.underlying_bridged_amount);
 
                     if (ret.action_id == CONSTANTS::DEPOSIT) {
                         let bridge = self.underlying_to_bridge.read(underlying);
