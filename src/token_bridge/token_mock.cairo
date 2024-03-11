@@ -53,11 +53,11 @@ mod TokenMock {
 
     #[abi(embed_v0)]
     impl MintableToken of IMintableToken<ContractState> {
-        fn permissionedMint(ref self: ContractState, account: ContractAddress, amount: u256) {
+        fn permissioned_mint(ref self: ContractState, account: ContractAddress, amount: u256) {
             self.erc20._mint(account, amount);
         }
 
-        fn permissionedBurn(ref self: ContractState, account: ContractAddress, amount: u256) {
+        fn permissioned_burn(ref self: ContractState, account: ContractAddress, amount: u256) {
             self.erc20._burn(account, amount);
         }
     }

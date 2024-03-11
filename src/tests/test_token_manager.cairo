@@ -281,7 +281,7 @@ mod testTokenManager {
     }
 
     #[test]
-    #[fuzzer(runs: 22, seed: 1)]
+    #[fuzzer(runs: 200, seed: 1)]
     fn test_internal_handle_withdrawals(x: u256, y: u256, z: u256, a: u256, b: u256) {
         let mut state = TokenManager::contract_state_for_testing();
         let withdrawal_epoch_delay = between(1, 10, x);
@@ -292,8 +292,11 @@ mod testTokenManager {
         let underlying_bridged_amount = between(0, BoundedInt::max() / 2, z);
         let buffer = between(0, BoundedInt::max() / 2, a);
 
+        
+
         let mut j = handled_epoch_withdrawal_len;
         let mut new_handled_epoch_withdrawal_len = handled_epoch_withdrawal_len;
+        state.handled_epoch_withdrawal_len.write(handled_epoch_withdrawal_len);
 
         let mut remaining_assets = underlying_bridged_amount + buffer;
         let mut needed_assets = 0;
@@ -307,7 +310,19 @@ mod testTokenManager {
                 remaining_assets -= withdrawal_pool_amount;
                 new_handled_epoch_withdrawal_len += 1;
             } else {
-                needed_assets += withdrawal_pool_amount - remaining_assets;
+                let mut cumulative_withdrawal_pool = withdrawal_pool_amount;
+                let mut k = j + 1;
+                loop {
+                    if (k > limit_epoch) {
+                        break ();
+                    }
+                    let new_withdrawal_pool_amount = between(0, CONSTANTS::WAD, b) * (k + 1);
+                    state.withdrawal_pool.write(k, new_withdrawal_pool_amount);
+                    cumulative_withdrawal_pool += new_withdrawal_pool_amount;
+                    k += 1;
+                };
+                needed_assets = cumulative_withdrawal_pool - remaining_assets;
+                break();
             }
             j += 1;
         };
@@ -315,6 +330,8 @@ mod testTokenManager {
             ._handle_withdrawals(
                 epoch, handled_epoch_withdrawal_len, withdrawal_epoch_delay, underlying_bridged_amount, buffer
             );
+        let new_handled_epoch_withdrawal_len_stored = state.handled_epoch_withdrawal_len.read();
+        assert(new_handled_epoch_withdrawal_len_stored == new_handled_epoch_withdrawal_len, 'wrong handled amount');
         assert(remaining_assets == remaining_assets_from_call, 'wrong remaining');
         assert(needed_assets == needed_assets_from_call, 'wrong needed');
     }

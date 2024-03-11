@@ -389,6 +389,7 @@ mod TokenManager {
 
             let withdrawal_pool = self.withdrawal_pool.read(withdrawal_info.epoch);
             let withdrawal_share = self.withdrawal_share.read(withdrawal_info.epoch);
+            
             let rate = self._withdrawal_exchange_rate_calc(withdrawal_pool, withdrawal_share);
             let assets = (rate * withdrawal_info.shares) / CONSTANTS::WAD;
 
@@ -624,20 +625,30 @@ mod TokenManager {
                 let mut new_handled_epoch_withdrawal_len = handled_epoch_withdrawal_len;
                 let mut j = handled_epoch_withdrawal_len;
                 let limit_epoch = epoch - withdrawal_epoch_delay;
+                let mut withdrawal_pool_mem = 0;
                 loop {
                     if (j > limit_epoch) {
                         break ();
                     }
 
-                    let withdrawal_pool = self.withdrawal_pool.read(j);
+                    withdrawal_pool_mem = self.withdrawal_pool.read(j);
 
-                    if (remaining_assets >= withdrawal_pool) {
-                        remaining_assets -= withdrawal_pool;
+                    if (remaining_assets >= withdrawal_pool_mem) {
+                        remaining_assets -= withdrawal_pool_mem;
                         new_handled_epoch_withdrawal_len += 1;
                     } else {
-                        needed_assets += withdrawal_pool - remaining_assets;
+                        let mut cumulative_withdrawal_pool = withdrawal_pool_mem;
+                        let mut k = j + 1;
+                        loop {
+                            if (k > limit_epoch) {
+                                break ();
+                            }
+                            cumulative_withdrawal_pool += self.withdrawal_pool.read(k);
+                            k += 1;
+                        };
+                        needed_assets = cumulative_withdrawal_pool - remaining_assets;
+                        break();
                     }
-
                     j += 1;
                 };
                 if (new_handled_epoch_withdrawal_len > handled_epoch_withdrawal_len) {

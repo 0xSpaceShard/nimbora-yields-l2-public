@@ -21,3 +21,13 @@ test = "snforge test"
 [tool.fmt]
 sort-module-level-items = true
 max-line-length = 120
+
+[[tool.snforge.fork]]
+name = "MAINNET_FORK_BEFORE"
+url = "https://starknet-mainnet.blastapi.io/f8917e6b-fd2f-49d3-b2b2-1a182408d008/rpc/v0_6"
+block_id.number = "604586"
+
+[[tool.snforge.fork]]
+name = "MAINNET_FORK_AFTER"
+url = "https://starknet-mainnet.blastapi.io/f8917e6b-fd2f-49d3-b2b2-1a182408d008/rpc/v0_6"
+block_id.number = "604600"
