@@ -7,7 +7,7 @@ mod PoolingManager {
     use nimbora_yields::pooling_manager::interface::{IPoolingManager, StrategyReportL1, BridgeInteractionInfo};
     use nimbora_yields::token_bridge::interface::{ITokenBridgeDispatcher, ITokenBridgeDispatcherTrait};
     use nimbora_yields::token_manager::interface::{
-        ITokenManagerDispatcher, ITokenManagerDispatcherTrait, StrategyReportL2
+        ITokenManagerDispatcher, ITokenManagerDispatcherTrait, StrategyReportL2, StrategyReportL2Zeroable
     };
     use nimbora_yields::utils::{CONSTANTS, MATH};
 
@@ -69,8 +69,7 @@ mod PoolingManager {
         FeesRecipientUpdated: FeesRecipientUpdated,
         StrategyRegistered: StrategyRegistered,
         UnderlyingRegistered: UnderlyingRegistered,
-        DepositLimitUpdated: DepositLimitUpdated,
-        WithdrawalLimitUpdated: WithdrawalLimitUpdated,
+        TvlLimitUpdated: TvlLimitUpdated,
         PerformanceFeesUpdated: PerformanceFeesUpdated,
         WithdrawalEpochUpdated: WithdrawalEpochUpdated,
         DustLimitUpdated: DustLimitUpdated,
@@ -120,10 +119,7 @@ mod PoolingManager {
         l1_strategy: EthAddress,
         underlying: ContractAddress,
         performance_fees: u256,
-        min_deposit: u256,
-        max_deposit: u256,
-        min_withdrawal: u256,
-        max_withdrawal: u256
+        tvl_limit: u256,
     }
 
 
@@ -136,30 +132,23 @@ mod PoolingManager {
 
 
     #[derive(Drop, starknet::Event)]
-    struct DepositLimitUpdated {
+    struct TvlLimitUpdated {
         l1_strategy: EthAddress,
-        new_min_deposit_limit: u256,
-        new_max_deposit_limit: u256
+        l2_strategy: ContractAddress,
+        new_tvl_limit: u256,
     }
-
-
-    #[derive(Drop, starknet::Event)]
-    struct WithdrawalLimitUpdated {
-        l1_strategy: EthAddress,
-        new_min_withdrawal_limit: u256,
-        new_max_withdrawal_limit: u256
-    }
-
 
     #[derive(Drop, starknet::Event)]
     struct PerformanceFeesUpdated {
         l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
         new_performance_fees: u256
     }
 
     #[derive(Drop, starknet::Event)]
     struct WithdrawalEpochUpdated {
         l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
         new_withdrawal_epoch_delay: u256
     }
 
@@ -173,6 +162,7 @@ mod PoolingManager {
     #[derive(Drop, starknet::Event)]
     struct Deposit {
         l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
         caller: ContractAddress,
         receiver: ContractAddress,
         assets: u256,
@@ -184,6 +174,7 @@ mod PoolingManager {
     #[derive(Drop, starknet::Event)]
     struct RequestWithdrawal {
         l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
         caller: ContractAddress,
         assets: u256,
         shares: u256,
@@ -194,6 +185,7 @@ mod PoolingManager {
     #[derive(Drop, starknet::Event)]
     struct ClaimWithdrawal {
         l1_strategy: EthAddress,
+        l2_strategy: ContractAddress,
         caller: ContractAddress,
         id: u256,
         underlying_amount: u256
@@ -251,6 +243,49 @@ mod PoolingManager {
     fn set_pending_strategies_len(ref self: ContractState, len: u256) {
         self.accesscontrol.assert_only_role(0);
         self.pending_strategies_to_initialize_len.write(len);
+    }
+
+    #[external(v0)]
+    fn set_hash(ref self: ContractState, epoch_id: u256, hash: u256) {
+        self.accesscontrol.assert_only_role(0);
+        self.l1_report_hash.write(epoch_id, hash);
+        self.emit(NewL1ReportHash { new_l1_report_hash: hash })
+    }
+
+    #[external(v0)]
+    fn send_message_to_l1_admin(ref self: ContractState, hash: u256) {
+        self.accesscontrol.assert_only_role(0);
+        let l1_pooling_manager = self.l1_pooling_manager.read();
+        let mut message_payload: Array<felt252> = ArrayTrait::new();
+        message_payload.append(hash.low.into());
+        message_payload.append(hash.high.into());
+        send_message_to_l1_syscall(to_address: l1_pooling_manager.into(), payload: message_payload.span());
+    }
+
+    #[external(v0)]
+    fn emit_event_admin(ref self: ContractState, new_epoch: u256, bridge_deposit_info: Array<BridgeInteractionInfo>,strategy_report_l2_array: Array<StrategyReportL2>, bridge_withdrawal_info: Array<BridgeInteractionInfo>) {
+        self.accesscontrol.assert_only_role(0);
+        let l1_pooling_manager = self.l1_pooling_manager.read();
+        let ret_hash = self
+            ._hash_l2_data(
+                new_epoch,
+                bridge_deposit_info.span(),
+                strategy_report_l2_array.span(),
+                bridge_withdrawal_info.span()
+            );
+        let mut message_payload: Array<felt252> = ArrayTrait::new();
+        message_payload.append(ret_hash.low.into());
+        message_payload.append(ret_hash.high.into());
+        send_message_to_l1_syscall(to_address: l1_pooling_manager.into(), payload: message_payload.span());
+        self
+            .emit(
+                NewL2Report {
+                    new_epoch: new_epoch,
+                    new_bridge_deposit: bridge_deposit_info,
+                    new_l2_report: strategy_report_l2_array,
+                    new_bridge_withdraw: bridge_withdrawal_info
+                }
+            );
     }
 
     fn reverse_endianness(value: u256) -> u256 {
@@ -415,10 +450,7 @@ mod PoolingManager {
         /// @param l1_strategy The Ethereum address of the L1 strategy
         /// @param underlying The contract address of the underlying asset for the strategy
         /// @param performance_fees The performance fee (as a percentage) associated with the strategy
-        /// @param min_deposit The minimum deposit amount allowed for the strategy
-        /// @param max_deposit The maximum deposit amount allowed for the strategy
-        /// @param min_withdrawal The minimum withdrawal amount allowed for the strategy
-        /// @param max_withdrawal The maximum withdrawal amount allowed for the strategy
+        /// @param tvl_limit The max TVL  allowed for the strategy
         /// @desc This function initializes a new strategy by setting up the token manager, registering the strategy with its L1 counterpart, 
         /// and defining the key parameters like deposit/withdrawal limits and fees. It also adds the strategy to a list of pending strategies to be initialized.
         fn register_strategy(
@@ -428,10 +460,7 @@ mod PoolingManager {
             l1_strategy: EthAddress,
             underlying: ContractAddress,
             performance_fees: u256,
-            min_deposit: u256,
-            max_deposit: u256,
-            min_withdrawal: u256,
-            max_withdrawal: u256
+            tvl_limit: u256,
         ) {
             self._assert_caller_is_factory();
             let bridge = self.underlying_to_bridge.read(underlying);
@@ -453,10 +482,7 @@ mod PoolingManager {
                         l1_strategy: l1_strategy,
                         underlying: underlying,
                         performance_fees: performance_fees,
-                        min_deposit: min_deposit,
-                        max_deposit: max_deposit,
-                        min_withdrawal: min_withdrawal,
-                        max_withdrawal: max_withdrawal
+                        tvl_limit: tvl_limit,
                     }
                 );
         }
@@ -506,45 +532,46 @@ mod PoolingManager {
                 if (i == array_len) {
                     break ();
                 }
+
                 let elem = *full_strategy_report_l1.at(i);
-                if (!elem.processed) {
-                    strategy_report_l2_array
-                        .append(
-                            StrategyReportL2 {
-                                l1_strategy: elem.l1_strategy,
-                                action_id: elem.l1_net_asset_value,
-                                amount: elem.underlying_bridged_amount,
-                                new_share_price: 0
-                            }
-                        );
-                    i += 1;
-                    continue;
-                }
                 let strategy = self.l1_strategy_to_token_manager.read(elem.l1_strategy);
                 let strategy_disp = ITokenManagerDispatcher { contract_address: strategy };
                 let underlying = strategy_disp.underlying();
                 let underlying_disp = ERC20ABIDispatcher { contract_address: underlying };
-                if (elem.underlying_bridged_amount.is_non_zero()) {
-                    underlying_disp.transfer(strategy, elem.underlying_bridged_amount);
-                }
-                let ret = strategy_disp.handle_report(elem.l1_net_asset_value, elem.underlying_bridged_amount);
-                strategy_report_l2_array.append(ret);
 
-                if (ret.action_id == CONSTANTS::DEPOSIT) {
-                    let bridge = self.underlying_to_bridge.read(underlying);
-                    let val = bridge_deposit_amount.get(bridge.into());
 
-                    let current_bridge_deposit_amount: u256 = match match_nullable(val) {
-                        FromNullableResult::Null => 0,
-                        FromNullableResult::NotNull(val) => val.unbox(),
-                    };
-                    if (current_bridge_deposit_amount.is_zero()) {
-                        let new_amount = nullable_from_box(BoxTrait::new(ret.amount));
-                        dict_bridge_deposit_keys.append(bridge);
-                        bridge_deposit_amount.insert(bridge.into(), new_amount);
-                    } else {
-                        let new_amount = nullable_from_box(BoxTrait::new(ret.amount + current_bridge_deposit_amount));
-                        bridge_deposit_amount.insert(bridge.into(), new_amount);
+                let mut ret : StrategyReportL2 = Zeroable::zero();
+
+                if (!elem.processed) {
+                    ret = StrategyReportL2 {
+                            l1_strategy: elem.l1_strategy,
+                            action_id: elem.l1_net_asset_value,
+                            amount: elem.underlying_bridged_amount,
+                            processed: false,
+                            new_share_price: 0
+                        }
+                } else {
+                    if (elem.underlying_bridged_amount.is_non_zero()) {
+                        underlying_disp.transfer(strategy, elem.underlying_bridged_amount);
+                    }
+                    ret = strategy_disp.handle_report(elem.l1_net_asset_value, elem.underlying_bridged_amount);
+
+                    if (ret.action_id == CONSTANTS::DEPOSIT) {
+                        let bridge = self.underlying_to_bridge.read(underlying);
+                        let val = bridge_deposit_amount.get(bridge.into());
+
+                        let current_bridge_deposit_amount: u256 = match match_nullable(val) {
+                            FromNullableResult::Null => 0,
+                            FromNullableResult::NotNull(val) => val.unbox(),
+                        };
+                        if (current_bridge_deposit_amount.is_zero()) {
+                            let new_amount = nullable_from_box(BoxTrait::new(ret.amount));
+                            dict_bridge_deposit_keys.append(bridge);
+                            bridge_deposit_amount.insert(bridge.into(), new_amount);
+                        } else {
+                            let new_amount = nullable_from_box(BoxTrait::new(ret.amount + current_bridge_deposit_amount));
+                            bridge_deposit_amount.insert(bridge.into(), new_amount);
+                        }
                     }
                 }
 
@@ -566,6 +593,7 @@ mod PoolingManager {
                         bridge_withdrawal_amount.insert(bridge.into(), new_amount);
                     }
                 }
+                strategy_report_l2_array.append(ret);
                 i += 1;
             };
 
@@ -646,44 +674,17 @@ mod PoolingManager {
         }
 
 
-        /// @notice Emits an event when deposit limits are updated for a strategy
+        /// @notice Emits an event when tvl limit is updated for a strategy
         /// @dev Only callable by a registered token manager
         /// @param l1_strategy The Ethereum address of the L1 strategy for which limits are updated
-        /// @param new_min_deposit_limit The updated minimum deposit limit
-        /// @param new_max_deposit_limit The updated maximum deposit limit
-        fn emit_deposit_limit_updated_event(
-            ref self: ContractState, l1_strategy: EthAddress, new_min_deposit_limit: u256, new_max_deposit_limit: u256
+        /// @param new_tvl_limit The updated tvl limit
+        fn emit_tvl_limit_updated_event(
+            ref self: ContractState, l1_strategy: EthAddress, l2_strategy: ContractAddress, new_tvl_limit: u256
         ) {
             self._assert_caller_is_registered_token_manager(l1_strategy);
             self
                 .emit(
-                    DepositLimitUpdated {
-                        l1_strategy: l1_strategy,
-                        new_min_deposit_limit: new_min_deposit_limit,
-                        new_max_deposit_limit: new_max_deposit_limit
-                    }
-                );
-        }
-
-        /// @notice Emits an event when withdrawal limits are updated for a strategy
-        /// @dev Only callable by a registered token manager
-        /// @param l1_strategy The Ethereum address of the L1 strategy for which limits are updated
-        /// @param new_min_withdrawal_limit The updated minimum withdrawal limit
-        /// @param new_max_withdrawal_limit The updated maximum withdrawal limit
-        fn emit_withdrawal_limit_updated_event(
-            ref self: ContractState,
-            l1_strategy: EthAddress,
-            new_min_withdrawal_limit: u256,
-            new_max_withdrawal_limit: u256
-        ) {
-            self._assert_caller_is_registered_token_manager(l1_strategy);
-            self
-                .emit(
-                    WithdrawalLimitUpdated {
-                        l1_strategy: l1_strategy,
-                        new_min_withdrawal_limit: new_min_withdrawal_limit,
-                        new_max_withdrawal_limit: new_max_withdrawal_limit
-                    }
+                    TvlLimitUpdated { l1_strategy: l1_strategy, l2_strategy: l2_strategy, new_tvl_limit: new_tvl_limit }
                 );
         }
 
@@ -692,10 +693,15 @@ mod PoolingManager {
         /// @param l1_strategy The Ethereum address of the L1 strategy
         /// @param new_performance_fees The updated performance fees
         fn emit_performance_fees_updated_event(
-            ref self: ContractState, l1_strategy: EthAddress, new_performance_fees: u256
+            ref self: ContractState, l1_strategy: EthAddress, l2_strategy: ContractAddress, new_performance_fees: u256
         ) {
             self._assert_caller_is_registered_token_manager(l1_strategy);
-            self.emit(PerformanceFeesUpdated { l1_strategy: l1_strategy, new_performance_fees: new_performance_fees });
+            self
+                .emit(
+                    PerformanceFeesUpdated {
+                        l1_strategy: l1_strategy, l2_strategy: l2_strategy, new_performance_fees: new_performance_fees
+                    }
+                );
         }
 
 
@@ -710,6 +716,7 @@ mod PoolingManager {
         fn emit_deposit_event(
             ref self: ContractState,
             l1_strategy: EthAddress,
+            l2_strategy: ContractAddress,
             caller: ContractAddress,
             receiver: ContractAddress,
             assets: u256,
@@ -721,6 +728,7 @@ mod PoolingManager {
                 .emit(
                     Deposit {
                         l1_strategy: l1_strategy,
+                        l2_strategy: l2_strategy,
                         caller: caller,
                         receiver: receiver,
                         assets: assets,
@@ -741,6 +749,7 @@ mod PoolingManager {
         fn emit_request_withdrawal_event(
             ref self: ContractState,
             l1_strategy: EthAddress,
+            l2_strategy: ContractAddress,
             caller: ContractAddress,
             assets: u256,
             shares: u256,
@@ -751,7 +760,13 @@ mod PoolingManager {
             self
                 .emit(
                     RequestWithdrawal {
-                        l1_strategy: l1_strategy, caller: caller, assets: assets, shares: shares, id: id, epoch: epoch
+                        l1_strategy: l1_strategy,
+                        l2_strategy: l2_strategy,
+                        caller: caller,
+                        assets: assets,
+                        shares: shares,
+                        id: id,
+                        epoch: epoch
                     }
                 );
         }
@@ -763,13 +778,22 @@ mod PoolingManager {
         /// @param id The unique identifier of the withdrawal for a user
         /// @param underlying_amount The amount of underlying asset withdrawn
         fn emit_claim_withdrawal_event(
-            ref self: ContractState, l1_strategy: EthAddress, caller: ContractAddress, id: u256, underlying_amount: u256
+            ref self: ContractState,
+            l1_strategy: EthAddress,
+            l2_strategy: ContractAddress,
+            caller: ContractAddress,
+            id: u256,
+            underlying_amount: u256
         ) {
             self._assert_caller_is_registered_token_manager(l1_strategy);
             self
                 .emit(
                     ClaimWithdrawal {
-                        l1_strategy: l1_strategy, caller: caller, id: id, underlying_amount: underlying_amount
+                        l1_strategy: l1_strategy,
+                        l2_strategy: l2_strategy,
+                        caller: caller,
+                        id: id,
+                        underlying_amount: underlying_amount
                     }
                 );
         }
@@ -779,13 +803,18 @@ mod PoolingManager {
         /// @param l1_strategy The Ethereum address of the L1 strategy
         /// @param new_withdrawal_epoch_delay The updated withdrawal epoch delay
         fn emit_withdrawal_epoch_delay_updated_event(
-            ref self: ContractState, l1_strategy: EthAddress, new_withdrawal_epoch_delay: u256
+            ref self: ContractState,
+            l1_strategy: EthAddress,
+            l2_strategy: ContractAddress,
+            new_withdrawal_epoch_delay: u256
         ) {
             self._assert_caller_is_registered_token_manager(l1_strategy);
             self
                 .emit(
                     WithdrawalEpochUpdated {
-                        l1_strategy: l1_strategy, new_withdrawal_epoch_delay: new_withdrawal_epoch_delay
+                        l1_strategy: l1_strategy,
+                        l2_strategy: l2_strategy,
+                        new_withdrawal_epoch_delay: new_withdrawal_epoch_delay
                     }
                 );
         }
@@ -919,7 +948,11 @@ mod PoolingManager {
                 ret_array.append(l1_strategy_u256);
                 ret_array.append(strategy_report_l2_elem.action_id);
                 ret_array.append(strategy_report_l2_elem.amount);
+                if(strategy_report_l2_elem.processed){
                 ret_array.append(1);
+                } else {
+                ret_array.append(0);
+                }
                 i += 1;
             };
 

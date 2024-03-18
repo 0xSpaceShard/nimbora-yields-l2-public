@@ -7,7 +7,7 @@ edition = "2023_10"
 
 [dependencies]
 openzeppelin = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v0.8.0" }
-snforge_std =  { git = "https://github.com/foundry-rs/starknet-foundry.git", tag = "v0.13.0" }
+snforge_std =  { git = "https://github.com/foundry-rs/starknet-foundry.git", tag = "v0.16.0" }
 
 [[target.starknet-contract]]
 sierra = true
@@ -17,3 +17,17 @@ allowed-libfuncs-list.name = "experimental"
 
 [scripts]
 test = "snforge test"
+
+[tool.fmt]
+sort-module-level-items = true
+max-line-length = 120
+
+[[tool.snforge.fork]]
+name = "MAINNET_FORK_BEFORE"
+url = "https://starknet-mainnet.blastapi.io/f8917e6b-fd2f-49d3-b2b2-1a182408d008/rpc/v0_6"
+block_id.number = "604586"
+
+[[tool.snforge.fork]]
+name = "MAINNET_FORK_AFTER"
+url = "https://starknet-mainnet.blastapi.io/f8917e6b-fd2f-49d3-b2b2-1a182408d008/rpc/v0_6"
+block_id.number = "604600"

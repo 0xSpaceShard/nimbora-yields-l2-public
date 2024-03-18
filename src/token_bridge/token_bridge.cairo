@@ -112,7 +112,7 @@ mod TokenBridge {
             assert(amount <= balance_before, INSUFFICIENT_FUNDS);
 
             let mintable_token = IMintableTokenDispatcher { contract_address: l2_token };
-            mintable_token.permissionedBurn(caller_address, amount);
+            mintable_token.permissioned_burn(caller_address, amount);
 
             let balance_after = IERC20CamelDispatcher { contract_address: l2_token }.balanceOf(caller_address);
 
@@ -174,7 +174,7 @@ mod TokenBridge {
                 .balanceOf(account.try_into().unwrap());
 
             let mintable_token = IMintableTokenDispatcher { contract_address: l2_token };
-            mintable_token.permissionedMint(account.try_into().unwrap(), amount);
+            mintable_token.permissioned_mint(account.try_into().unwrap(), amount);
 
             let balance_after = IERC20CamelDispatcher { contract_address: l2_token }
                 .balanceOf(account.try_into().unwrap());

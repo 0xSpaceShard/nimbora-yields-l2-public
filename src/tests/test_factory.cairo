@@ -135,7 +135,7 @@ mod testFactory {
     fn deploy_strategy_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
-        factory.deploy_strategy(0.try_into().unwrap(), 0.try_into().unwrap(), 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        factory.deploy_strategy(0.try_into().unwrap(), 0.try_into().unwrap(), 0, 0, 0, 0, 0, 0);
     }
 
     #[test]

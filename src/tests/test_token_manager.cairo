@@ -14,9 +14,10 @@ mod testTokenManager {
         transfer_to_users, deposit, deposit_and_handle_mass, between, deploy_mock_mintable_token, setup_0,
         deploy_mock_transfer
     };
-    use nimbora_yields::token_bridge::interface::{
-        ITokenBridgeDispatcher, IMintableTokenDispatcher, IMintableTokenDispatcherTrait};
     use nimbora_yields::token::interface::{ITokenDispatcher, ITokenDispatcherTrait};
+    use nimbora_yields::token_bridge::interface::{
+        ITokenBridgeDispatcher, IMintableTokenDispatcher, IMintableTokenDispatcherTrait
+    };
 
     // Utils peripheric contracts
     use nimbora_yields::token_bridge::token_bridge::{TokenBridge};
@@ -280,7 +281,7 @@ mod testTokenManager {
     }
 
     #[test]
-    #[fuzzer(runs: 22, seed: 1)]
+    #[fuzzer(runs: 200, seed: 1)]
     fn test_internal_handle_withdrawals(x: u256, y: u256, z: u256, a: u256, b: u256) {
         let mut state = TokenManager::contract_state_for_testing();
         let withdrawal_epoch_delay = between(1, 10, x);
@@ -291,8 +292,11 @@ mod testTokenManager {
         let underlying_bridged_amount = between(0, BoundedInt::max() / 2, z);
         let buffer = between(0, BoundedInt::max() / 2, a);
 
+        
+
         let mut j = handled_epoch_withdrawal_len;
         let mut new_handled_epoch_withdrawal_len = handled_epoch_withdrawal_len;
+        state.handled_epoch_withdrawal_len.write(handled_epoch_withdrawal_len);
 
         let mut remaining_assets = underlying_bridged_amount + buffer;
         let mut needed_assets = 0;
@@ -306,7 +310,19 @@ mod testTokenManager {
                 remaining_assets -= withdrawal_pool_amount;
                 new_handled_epoch_withdrawal_len += 1;
             } else {
-                needed_assets += withdrawal_pool_amount - remaining_assets;
+                let mut cumulative_withdrawal_pool = withdrawal_pool_amount;
+                let mut k = j + 1;
+                loop {
+                    if (k > limit_epoch) {
+                        break ();
+                    }
+                    let new_withdrawal_pool_amount = between(0, CONSTANTS::WAD, b) * (k + 1);
+                    state.withdrawal_pool.write(k, new_withdrawal_pool_amount);
+                    cumulative_withdrawal_pool += new_withdrawal_pool_amount;
+                    k += 1;
+                };
+                needed_assets = cumulative_withdrawal_pool - remaining_assets;
+                break();
             }
             j += 1;
         };
@@ -314,6 +330,8 @@ mod testTokenManager {
             ._handle_withdrawals(
                 epoch, handled_epoch_withdrawal_len, withdrawal_epoch_delay, underlying_bridged_amount, buffer
             );
+        let new_handled_epoch_withdrawal_len_stored = state.handled_epoch_withdrawal_len.read();
+        assert(new_handled_epoch_withdrawal_len_stored == new_handled_epoch_withdrawal_len, 'wrong handled amount');
         assert(remaining_assets == remaining_assets_from_call, 'wrong remaining');
         assert(needed_assets == needed_assets_from_call, 'wrong needed');
     }
@@ -428,10 +446,7 @@ mod testTokenManager {
             l1_strategy,
             underlying,
             performance_fees,
-            min_deposit,
-            max_deposit,
-            min_withdrawal,
-            max_withdrawal,
+            tvl_limit,
             withdrawal_epoch_delay,
             dust_limit
         ) =
@@ -440,10 +455,7 @@ mod testTokenManager {
         assert(token_manager.l1_strategy() == l1_strategy, 'Wrong l1 strategy');
         assert(token_manager.underlying() == underlying, 'Wrong underlying');
         assert(token_manager.performance_fees() == performance_fees, 'Wrong performance fees');
-        assert(token_manager.deposit_limit_low() == min_deposit, 'Wrong deposit limit low');
-        assert(token_manager.deposit_limit_high() == max_deposit, 'Wrong deposit limit high');
-        assert(token_manager.withdrawal_limit_low() == min_withdrawal, 'Wrong withdrawal limit low');
-        assert(token_manager.withdrawal_limit_high() == max_withdrawal, 'Wrong withdrawal limit high');
+        assert(token_manager.tvl_limit() == tvl_limit, 'Wrong tvl limit');
         assert(token_manager.withdrawal_epoch_delay() == withdrawal_epoch_delay, 'Wrong withdrawal epoch delay');
         assert(token_manager.dust_limit() == dust_limit, 'Wrong withdrawal dust limit');
     }
@@ -451,13 +463,13 @@ mod testTokenManager {
     #[test]
     #[should_panic(expected: ('Invalid caller',))]
     fn initialize_token_manager_wrong_caller() {
-        let (token_manager, _, _, _, _, _, _, _, _, _, _, _) = deploy_token_manager_and_provide_args();
+        let (token_manager, _, _, _, _, _, _, _, _,) = deploy_token_manager_and_provide_args();
         token_manager.initialiser(3.try_into().unwrap());
     }
 
     #[test]
     fn initialize_token_manager() {
-        let (token_manager, _, pooling_manager, _, _, _, _, _, _, _, _, _) = deploy_token_manager_and_provide_args();
+        let (token_manager, _, pooling_manager, _, _, _, _, _, _) = deploy_token_manager_and_provide_args();
         let nimbora_token: ContractAddress = 3.try_into().unwrap();
         start_prank(CheatTarget::One(token_manager.contract_address), pooling_manager);
         token_manager.initialiser(nimbora_token);
@@ -541,7 +553,7 @@ mod testTokenManager {
     fn token_manager_set_deposit_limit_wrong_caller() {
         let (token_manager_address, _, _, _) = deploy_strategy();
         let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
-        token_manager.set_deposit_limit(1000000000, 2000000000);
+        token_manager.set_tvl_limit(2000000000);
     }
 
     #[test]
@@ -550,94 +562,23 @@ mod testTokenManager {
         let (token_manager_address, _, _, owner) = deploy_strategy();
         let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
         start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.set_deposit_limit(0, 1);
-        stop_prank(CheatTarget::One(token_manager.contract_address));
-    }
-
-    #[test]
-    #[fuzzer(runs: 22, seed: 1)]
-    #[should_panic(expected: ('Invalid limit',))]
-    fn token_manager_set_deposit_limit_low_greater_high(x: u256, y: u256) {
-        let (token_manager_address, _, _, owner) = deploy_strategy();
-        let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
-
-        // Preventing u256 overflow
-        let low_limit = (x / 2) + 1;
-        let high_limit = between(0, low_limit, y);
-
-        start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.set_deposit_limit(low_limit, high_limit);
+        token_manager.set_tvl_limit(0);
         stop_prank(CheatTarget::One(token_manager.contract_address));
     }
 
     #[test]
     #[fuzzer(runs: 22, seed: 2)]
-    fn token_manager_set_deposit_limit(x: u256, y: u256) {
+    fn token_manager_set_tvl_limit(x: u256, y: u256) {
         let (token_manager_address, _, _, owner) = deploy_strategy();
         let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
 
-        let low_limit = (x / 2) + 1;
-        let high_limit = between(low_limit, BoundedInt::max(), y) + 1;
+        let tvl_limit = between(1, BoundedInt::max(), y) + 1;
         start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.set_deposit_limit(low_limit, high_limit);
+        token_manager.set_tvl_limit(tvl_limit);
         stop_prank(CheatTarget::One(token_manager.contract_address));
 
-        let low_limit = token_manager.deposit_limit_low();
-        let high_limit = token_manager.deposit_limit_high();
-        assert(low_limit == low_limit, 'Wrong low deposit limit');
-        assert(high_limit == high_limit, 'Wrong high deposit limit');
-    }
-
-    #[test]
-    #[should_panic(expected: ('Invalid caller',))]
-    fn token_manager_set_withdrawal_limit_wrong_caller() {
-        let (token_manager_address, _, _, _) = deploy_strategy();
-        let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
-        token_manager.set_withdrawal_limit(1000000000, 2000000000);
-    }
-
-    #[test]
-    #[should_panic(expected: ('Amount nul',))]
-    fn token_manager_set_withdrawal_limit_zero() {
-        let (token_manager_address, _, _, owner) = deploy_strategy();
-        let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
-        start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.set_withdrawal_limit(0, 1);
-        stop_prank(CheatTarget::One(token_manager.contract_address));
-    }
-
-    #[test]
-    #[fuzzer(runs: 22, seed: 1)]
-    #[should_panic(expected: ('Invalid limit',))]
-    fn token_manager_set_withdrawal_limit_low_greater_high(x: u256, y: u256) {
-        let (token_manager_address, _, _, owner) = deploy_strategy();
-        let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
-
-        // Preventing u256 overflow
-        let low_limit = (x / 2) + 1;
-        let high_limit = between(0, low_limit, y);
-
-        start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.set_withdrawal_limit(low_limit, high_limit);
-        stop_prank(CheatTarget::One(token_manager.contract_address));
-    }
-
-    #[test]
-    #[fuzzer(runs: 22, seed: 2)]
-    fn token_manager_set_withdrawal_limit(x: u256, y: u256) {
-        let (token_manager_address, _, _, owner) = deploy_strategy();
-        let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
-
-        let low_limit = (x / 2) + 1;
-        let high_limit = between(low_limit, BoundedInt::max(), y) + 1;
-        start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.set_withdrawal_limit(low_limit, high_limit);
-        stop_prank(CheatTarget::One(token_manager.contract_address));
-
-        let low_limit = token_manager.withdrawal_limit_low();
-        let high_limit = token_manager.withdrawal_limit_high();
-        assert(low_limit == low_limit, 'Wrong low withdrawal limit');
-        assert(high_limit == high_limit, 'Wrong high withdrawal limit');
+        let tvl_limit = token_manager.tvl_limit();
+        assert(tvl_limit == tvl_limit, 'Wrong tvl limit');
     }
 
     // test set_withdrawal_epoch_delay with wrong caller
@@ -708,27 +649,13 @@ mod testTokenManager {
 
     #[test]
     #[fuzzer(runs: 22, seed: 2)]
-    #[should_panic(expected: ('Low limit reached',))]
-    fn test_deposit_low_limit_reached(x: u256) {
+    #[should_panic(expected: ('Tvl limit reached',))]
+    fn test_deposit_tvl_limit_reached(x: u256) {
         let (token_manager_address, _, _, owner) = deploy_strategy();
         let receiver = contract_address_const::<24>();
         let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
-        let min_deposit = 99999999999999999;
-        let assets = between(0, min_deposit, x);
-        start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.deposit(assets, receiver, receiver);
-        stop_prank(CheatTarget::One(token_manager.contract_address));
-    }
-
-    #[test]
-    #[fuzzer(runs: 22, seed: 2)]
-    #[should_panic(expected: ('High limit reached',))]
-    fn test_deposit_high_limit_reached(x: u256) {
-        let (token_manager_address, _, _, owner) = deploy_strategy();
-        let receiver = contract_address_const::<24>();
-        let max_deposit = 10000000000000000001;
-        let assets = between(max_deposit, BoundedInt::max(), x);
-        let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
+        let tvl_limit = 10000000000000000000 + 1;
+        let assets = between(tvl_limit, BoundedInt::max(), x);
         start_prank(CheatTarget::One(token_manager.contract_address), owner);
         token_manager.deposit(assets, receiver, receiver);
         stop_prank(CheatTarget::One(token_manager.contract_address));
@@ -740,11 +667,8 @@ mod testTokenManager {
         let (token_manager_address, _, _, owner) = deploy_strategy();
         let receiver = contract_address_const::<24>();
 
-        let min_deposit_1 = 100000000000000000;
-        let max_deposit_1 = 10000000000000000000;
-
-        let assets = between(min_deposit_1, max_deposit_1, x);
-
+        let tvl_limit = 10000000000000000000;
+        let assets = between(1, tvl_limit, x);
         let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
         let underlying_token_address = token_manager.underlying();
         let underlying_token = ERC20ABIDispatcher { contract_address: underlying_token_address };
@@ -769,54 +693,21 @@ mod testTokenManager {
     }
 
     #[test]
-    #[fuzzer(runs: 22, seed: 2)]
-    #[should_panic(expected: ('Low limit reached',))]
-    fn test_request_withdrawal_low_limit_reached(x: u256) {
-        let (token_manager_address, _, _, owner) = deploy_strategy();
-        let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
-        let min_withdraw = 200000000000000000 - 1;
-        let shares = between(0, min_withdraw, x);
-        start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.request_withdrawal(shares);
-        stop_prank(CheatTarget::One(token_manager.contract_address));
-    }
-
-    #[test]
-    #[fuzzer(runs: 22, seed: 2)]
-    #[should_panic(expected: ('High limit reached',))]
-    fn test_request_withdrawal_high_limit_reached(x: u256) {
-        let (token_manager_address, _, _, owner) = deploy_strategy();
-        contract_address_const::<24>();
-        let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
-
-        let max_withdraw = 2000000000000000000000000 + 1;
-
-        let shares = between(max_withdraw, BoundedInt::max(), x);
-
-        start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.request_withdrawal(shares);
-        stop_prank(CheatTarget::One(token_manager.contract_address));
-    }
-
-    #[test]
     #[fuzzer(runs: 22, seed: 1)]
     fn test_request_withdrawal(x: u256, y: u256) {
         let (token_manager_address, _, _, owner) = deploy_strategy();
 
         let receiver = contract_address_const::<24>();
-        let min_deposit_1 = 1000000000000000000;
-        let max_deposit_1 = 10000000000000000000;
+        let tvl_limit = 10000000000000000000;
 
         let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
         let nimbora_token = token_manager.token();
         let nimbora_token_disp = ERC20ABIDispatcher { contract_address: nimbora_token };
 
-        let assets = between(min_deposit_1, max_deposit_1, x);
+        let assets = between(1, tvl_limit, x);
         deposit(token_manager_address, owner, assets, receiver);
 
-        let min_withdraw = 200000000000000000;
-
-        let shares_to_withdraw = between(min_withdraw, assets, y);
+        let shares_to_withdraw = between(1, assets, y);
         start_prank(CheatTarget::One(token_manager.contract_address), receiver);
         token_manager.request_withdrawal(shares_to_withdraw);
         stop_prank(CheatTarget::One(token_manager.contract_address));
@@ -859,7 +750,7 @@ mod testTokenManager {
         let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
 
         start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.claim_withdrawal(id);
+        token_manager.claim_withdrawal(owner, id);
         stop_prank(CheatTarget::One(token_manager.contract_address));
     }
 
@@ -888,7 +779,7 @@ mod testTokenManager {
         let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
 
         start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.claim_withdrawal(id);
+        token_manager.claim_withdrawal(owner, id);
         stop_prank(CheatTarget::One(token_manager.contract_address));
     }
 
@@ -929,7 +820,7 @@ mod testTokenManager {
         let token_manager = ITokenManagerDispatcher { contract_address: token_manager_address };
 
         start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.claim_withdrawal(id);
+        token_manager.claim_withdrawal(owner, id);
         stop_prank(CheatTarget::One(token_manager.contract_address));
     }
 
@@ -1004,7 +895,7 @@ mod testTokenManager {
         let previous_owner_balance = underlying_disp.balanceOf(owner);
 
         start_prank(CheatTarget::One(token_manager.contract_address), owner);
-        token_manager.claim_withdrawal(id);
+        token_manager.claim_withdrawal(owner, id);
         stop_prank(CheatTarget::One(token_manager.contract_address));
 
         let new_withdrawal_pool = token_manager.withdrawal_pool(withdrawal_user_epoch);

@@ -1,4 +1,4 @@
-use starknet::{ContractAddress, ClassHash, eth_address::EthAddress};
+use starknet::{ContractAddress, ClassHash, eth_address::EthAddress, Zeroable};
 
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -16,14 +16,35 @@ impl WithdrawalInfoIntoSpan of Into<WithdrawalInfo, Span<felt252>> {
     }
 }
 
-#[derive(Copy, Drop, Serde)]
+#[derive(Copy, Drop, Serde, PartialEq)]
 struct StrategyReportL2 {
     l1_strategy: EthAddress,
     action_id: u256,
     amount: u256,
+    processed: bool,
     new_share_price: u256
 }
 
+impl StrategyReportL2Zeroable of Zeroable<StrategyReportL2> {
+    fn zero() -> StrategyReportL2 {
+        StrategyReportL2{
+            l1_strategy: Zeroable::zero(),
+            action_id: Zeroable::zero(),
+            amount: Zeroable::zero(),
+            processed: false,
+            new_share_price: Zeroable::zero()
+        }
+    }
+
+    #[inline(always)]
+    fn is_zero(self: StrategyReportL2) -> bool {
+        self == StrategyReportL2Zeroable::zero()
+    }
+    #[inline(always)]
+    fn is_non_zero(self: StrategyReportL2) -> bool {
+        self != StrategyReportL2Zeroable::zero()
+    }
+}
 
 #[starknet::interface]
 trait ITokenManager<TContractState> {
@@ -32,10 +53,7 @@ trait ITokenManager<TContractState> {
     fn underlying(self: @TContractState) -> ContractAddress;
     fn token(self: @TContractState) -> ContractAddress;
     fn performance_fees(self: @TContractState) -> u256;
-    fn deposit_limit_low(self: @TContractState) -> u256;
-    fn deposit_limit_high(self: @TContractState) -> u256;
-    fn withdrawal_limit_low(self: @TContractState) -> u256;
-    fn withdrawal_limit_high(self: @TContractState) -> u256;
+    fn tvl_limit(self: @TContractState) -> u256;
     fn withdrawal_epoch_delay(self: @TContractState) -> u256;
     fn handled_epoch_withdrawal_len(self: @TContractState) -> u256;
     fn epoch(self: @TContractState) -> u256;
@@ -58,9 +76,7 @@ trait ITokenManager<TContractState> {
 
     fn set_performance_fees(ref self: TContractState, new_performance_fees: u256);
 
-    fn set_deposit_limit(ref self: TContractState, new_deposit_limit_low: u256, new_deposit_limit_high: u256);
-
-    fn set_withdrawal_limit(ref self: TContractState, new_withdrawal_limit_low: u256, new_withdrawal_limit_high: u256);
+    fn set_tvl_limit(ref self: TContractState, new_tvl_limit: u256);
 
     fn set_withdrawal_epoch_delay(ref self: TContractState, new_withdrawal_epoch_delay: u256);
 
@@ -70,7 +86,7 @@ trait ITokenManager<TContractState> {
 
     fn request_withdrawal(ref self: TContractState, shares: u256);
 
-    fn claim_withdrawal(ref self: TContractState, id: u256);
+    fn claim_withdrawal(ref self: TContractState, user: ContractAddress, id: u256);
 
     fn handle_report(
         ref self: TContractState, new_l1_net_asset_value: u256, underlying_bridged_amount: u256

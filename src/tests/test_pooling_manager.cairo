@@ -584,11 +584,11 @@ mod testPoolingManager {
         };
 
         let strategy_report_1 = StrategyReportL2 {
-            l1_strategy: 1.try_into().unwrap(), action_id: 15, amount: 10000, new_share_price: 50000000000000,
+            l1_strategy: 1.try_into().unwrap(), action_id: 15, amount: 10000, processed: false, new_share_price: 50000000000000
         };
 
         let strategy_report_2 = StrategyReportL2 {
-            l1_strategy: 2.try_into().unwrap(), action_id: 1, amount: 510000, new_share_price: 50000000000000,
+            l1_strategy: 2.try_into().unwrap(), action_id: 1, amount: 510000, processed: false, new_share_price: 50000000000000
         };
 
         let bridge_withdrawal_info_1 = BridgeInteractionInfo {
@@ -628,7 +628,7 @@ mod testPoolingManager {
         let new_share_price: u256 = between(50000000000000, 5000000000000000000000000, z);
 
         let strategy_report = StrategyReportL2 {
-            l1_strategy: 2.try_into().unwrap(), action_id: 1, amount: 10000, new_share_price: new_share_price,
+            l1_strategy: 2.try_into().unwrap(), action_id: 1, amount: 10000, processed: false, new_share_price: new_share_price
         };
 
         let bridge_withdrawal_info = BridgeInteractionInfo {
@@ -676,7 +676,7 @@ mod testPoolingManager {
         let new_share_price: u256 = between(50000000000000, 5000000000000000000000000, z);
 
         let strategy_report = StrategyReportL2 {
-            l1_strategy: 2.try_into().unwrap(), action_id: 1, amount: 10000, new_share_price: new_share_price,
+            l1_strategy: 2.try_into().unwrap(), action_id: 1, amount: 10000, processed: false, new_share_price: new_share_price,
         };
         let bridge_deposit_info = BridgeInteractionInfo { l1_bridge: 1.try_into().unwrap(), amount: deposit_amount };
 
@@ -758,6 +758,69 @@ mod testPoolingManager {
     }
 
     #[test]
+    fn hash_l1_data() {
+        let (
+            token_manager, 
+            token_address, 
+            pooling_manager, 
+            _
+        ) = deposit_and_handle_mass(Option::None);
+
+        let strategy_report_l1 = StrategyReportL1 {
+            l1_strategy: 2.try_into().unwrap(),
+            l1_net_asset_value: 200000000000000000,
+            underlying_bridged_amount: 0,
+            processed: true,
+        };
+
+        let hash_data = pooling_manager.hash_l1_data(array![strategy_report_l1].span());
+
+        assert(hash_data != 0, 'Wrong hash data');
+    }
+
+    #[test]
+    fn hash_l1_data_empty_strategy() {
+        let (
+            token_manager, 
+            token_address, 
+            pooling_manager, 
+            _
+        ) = deposit_and_handle_mass(Option::None);
+
+        let hash_data = pooling_manager.hash_l1_data(array![].span());
+        assert(hash_data != 0, 'Wrong hash data');
+    }
+
+    #[test]
+    fn hash_l1_data_collision() {
+        let (
+            token_manager, 
+            token_address, 
+            pooling_manager, 
+            _
+        ) = deposit_and_handle_mass(Option::None);
+
+        let strategy_report_l1_1 = StrategyReportL1 {
+            l1_strategy: 2.try_into().unwrap(),
+            l1_net_asset_value: 2000000000000000001,
+            underlying_bridged_amount: 0,
+            processed: true,
+        };
+
+        let strategy_report_l1_2 = StrategyReportL1 {
+            l1_strategy: 2.try_into().unwrap(),
+            l1_net_asset_value: 200000000000000000,
+            underlying_bridged_amount: 10,
+            processed: true,
+        };
+
+        let hash_data_1 = pooling_manager.hash_l1_data(array![strategy_report_l1_1].span());
+        let hash_data_2 = pooling_manager.hash_l1_data(array![strategy_report_l1_2].span());
+
+        assert(hash_data_1 != hash_data_2, 'Hash data collision');
+    }
+
+    #[test]
     fn upgrade_pooling_manager() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
@@ -794,7 +857,7 @@ mod testPoolingManager {
     #[should_panic(expected: ('Invalid caller',))]
     fn register_strategy_wrong_caller() {
         let (token_manager, token, pooling_manager, _) = deploy_strategy();
-        pooling_manager.register_strategy(token_manager, token, 1.try_into().unwrap(), token_manager, 1, 1, 100, 1, 50);
+        pooling_manager.register_strategy(token_manager, token, 1.try_into().unwrap(), token_manager, 1, 100);
     }
 
     #[test]
@@ -817,10 +880,7 @@ mod testPoolingManager {
         );
         let l1_strategy_1: EthAddress = 2.try_into().unwrap();
         let performance_fees_strategy_1 = 200000000000000000;
-        let min_deposit_1 = 100000000000000000;
-        let max_deposit_1 = 10000000000000000000;
-        let min_withdraw_1 = 200000000000000000;
-        let max_withdraw_1 = 2000000000000000000000000;
+        let tvl_limit = 100000000000000000;
         let withdrawal_epoch_delay_1 = 2;
         let dust_limit_1 = 1000000000000000000;
         let name_1 = 10;
@@ -834,10 +894,7 @@ mod testPoolingManager {
                 name_1,
                 symbol_1,
                 performance_fees_strategy_1,
-                min_deposit_1,
-                max_deposit_1,
-                min_withdraw_1,
-                max_withdraw_1,
+                tvl_limit,
                 withdrawal_epoch_delay_1,
                 dust_limit_1
             );
@@ -851,10 +908,7 @@ mod testPoolingManager {
                 l1_strategy_1,
                 Zeroable::zero(),
                 performance_fees_strategy_1,
-                min_deposit_1,
-                max_deposit_1,
-                min_withdraw_1,
-                max_withdraw_1,
+                tvl_limit,
             );
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
     }
@@ -879,10 +933,7 @@ mod testPoolingManager {
         );
         let l1_strategy_1: EthAddress = 2.try_into().unwrap();
         let performance_fees_strategy_1 = 200000000000000000;
-        let min_deposit_1 = 100000000000000000;
-        let max_deposit_1 = 10000000000000000000;
-        let min_withdraw_1 = 200000000000000000;
-        let max_withdraw_1 = 2000000000000000000000000;
+        let tvl_limit = 10000000000000000000;
         let withdrawal_epoch_delay_1 = 2;
         let dust_limit_1 = 1000000000000000000;
         let name_1 = 10;
@@ -896,10 +947,7 @@ mod testPoolingManager {
                 name_1,
                 symbol_1,
                 performance_fees_strategy_1,
-                min_deposit_1,
-                max_deposit_1,
-                min_withdraw_1,
-                max_withdraw_1,
+                tvl_limit,
                 withdrawal_epoch_delay_1,
                 dust_limit_1
             );
@@ -913,10 +961,7 @@ mod testPoolingManager {
                 l1_strategy_1,
                 token_1.contract_address,
                 performance_fees_strategy_1,
-                min_deposit_1,
-                max_deposit_1,
-                min_withdraw_1,
-                max_withdraw_1,
+                tvl_limit,
             );
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
     }
@@ -942,11 +987,11 @@ mod testPoolingManager {
 
     #[test]
     #[should_panic(expected: ('Invalid caller',))]
-    fn emit_deposit_limit_updated_event_wrong_caller() {
+    fn emit_tvl_limit_updated_event_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
-
-        pooling_manager.emit_deposit_limit_updated_event(l1_pooling_manager, 100, 200);
+        let l2_strategy = contract_address_const::<230>();
+        pooling_manager.emit_tvl_limit_updated_event(l1_pooling_manager, l2_strategy, 100);
     }
 
     #[test]
@@ -956,12 +1001,12 @@ mod testPoolingManager {
         let mut spy = spy_events(SpyOn::One(pooling_manager.contract_address));
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), token_manager);
-        pooling_manager.emit_deposit_limit_updated_event(l1_strategy, 100, 200);
+        pooling_manager.emit_tvl_limit_updated_event(l1_strategy, token_manager, 200);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         spy.fetch_events();
         let (_, event) = spy.events.at(0);
-        assert(event.keys.at(0) == @event_name_hash('DepositLimitUpdated'), 'Event was not emitted');
+        assert(event.keys.at(0) == @event_name_hash('TvlLimitUpdated'), 'Event was not emitted');
     }
 
     #[test]
@@ -969,8 +1014,8 @@ mod testPoolingManager {
     fn emit_performance_fees_updated_event_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
-
-        pooling_manager.emit_performance_fees_updated_event(l1_pooling_manager, 100);
+        let l2_strategy = contract_address_const::<230>();
+        pooling_manager.emit_performance_fees_updated_event(l1_pooling_manager, l2_strategy, 100);
     }
 
     #[test]
@@ -980,7 +1025,7 @@ mod testPoolingManager {
         let mut spy = spy_events(SpyOn::One(pooling_manager.contract_address));
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), token_manager);
-        pooling_manager.emit_performance_fees_updated_event(l1_strategy, 100);
+        pooling_manager.emit_performance_fees_updated_event(l1_strategy, token_manager, 100);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         spy.fetch_events();
@@ -993,8 +1038,8 @@ mod testPoolingManager {
     fn emit_deposit_event_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
-
-        pooling_manager.emit_deposit_event(l1_pooling_manager, owner, owner, 100, 200, owner);
+        let l2_strategy = contract_address_const::<230>();
+        pooling_manager.emit_deposit_event(l1_pooling_manager, l2_strategy, owner, owner, 100, 200, owner);
     }
 
     #[test]
@@ -1004,7 +1049,7 @@ mod testPoolingManager {
         let mut spy = spy_events(SpyOn::One(pooling_manager.contract_address));
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), token_manager);
-        pooling_manager.emit_deposit_event(l1_strategy, owner, owner, 100, 200, owner);
+        pooling_manager.emit_deposit_event(l1_strategy, token_manager, owner, owner, 100, 200, owner);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         spy.fetch_events();
@@ -1017,8 +1062,8 @@ mod testPoolingManager {
     fn emit_request_withdrawal_event_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
-
-        pooling_manager.emit_request_withdrawal_event(l1_pooling_manager, owner, 100, 200, 1, 1);
+        let l2_strategy = contract_address_const::<230>();
+        pooling_manager.emit_request_withdrawal_event(l1_pooling_manager, l2_strategy, owner, 100, 200, 1, 1);
     }
 
     #[test]
@@ -1028,7 +1073,7 @@ mod testPoolingManager {
         let mut spy = spy_events(SpyOn::One(pooling_manager.contract_address));
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), token_manager);
-        pooling_manager.emit_request_withdrawal_event(l1_strategy, owner, 100, 200, 1, 1);
+        pooling_manager.emit_request_withdrawal_event(l1_strategy, token_manager, owner, 100, 200, 1, 1);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         spy.fetch_events();
@@ -1041,8 +1086,9 @@ mod testPoolingManager {
     fn emit_claim_withdrawal_event_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
+        let l2_strategy = contract_address_const::<230>();
 
-        pooling_manager.emit_claim_withdrawal_event(l1_pooling_manager, owner, 1, 200);
+        pooling_manager.emit_claim_withdrawal_event(l1_pooling_manager, l2_strategy, owner, 1, 200);
     }
 
     #[test]
@@ -1052,7 +1098,7 @@ mod testPoolingManager {
         let mut spy = spy_events(SpyOn::One(pooling_manager.contract_address));
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), token_manager);
-        pooling_manager.emit_claim_withdrawal_event(l1_strategy, owner, 1, 200);
+        pooling_manager.emit_claim_withdrawal_event(l1_strategy, token_manager, owner, 1, 200);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         spy.fetch_events();
@@ -1065,8 +1111,9 @@ mod testPoolingManager {
     fn emit_withdrawal_epoch_delay_updated_event_wrong_caller() {
         let (owner, fees_recipient, l1_pooling_manager, pooling_manager, factory, token_hash, token_manager_hash) =
             setup_0();
+        let l2_strategy = contract_address_const::<230>();
 
-        pooling_manager.emit_withdrawal_epoch_delay_updated_event(l1_pooling_manager, 100);
+        pooling_manager.emit_withdrawal_epoch_delay_updated_event(l1_pooling_manager, l2_strategy, 100);
     }
 
     #[test]
@@ -1076,7 +1123,7 @@ mod testPoolingManager {
         let mut spy = spy_events(SpyOn::One(pooling_manager.contract_address));
 
         start_prank(CheatTarget::One(pooling_manager.contract_address), token_manager);
-        pooling_manager.emit_withdrawal_epoch_delay_updated_event(l1_strategy, 100);
+        pooling_manager.emit_withdrawal_epoch_delay_updated_event(l1_strategy, token_manager, 100);
         stop_prank(CheatTarget::One(pooling_manager.contract_address));
 
         spy.fetch_events();

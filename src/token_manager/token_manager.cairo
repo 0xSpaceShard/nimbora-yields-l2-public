@@ -30,10 +30,7 @@ mod TokenManager {
         l1_strategy: EthAddress,
         underlying: ContractAddress,
         performance_fees: u256,
-        deposit_limit_low: u256,
-        deposit_limit_high: u256,
-        withdrawal_limit_low: u256,
-        withdrawal_limit_high: u256,
+        tvl_limit: u256,
         withdrawal_epoch_delay: u256,
         token: ContractAddress,
         epoch: u256,
@@ -61,9 +58,8 @@ mod TokenManager {
         const INVALID_FEES: felt252 = 'Fee amount too high';
         const ZERO_AMOUNT: felt252 = 'Amount nul';
         const ZERO_ADDRESS: felt252 = 'Address is zero';
-        const INVALID_LIMIT: felt252 = 'Invalid limit';
-        const LOW_LIMIT: felt252 = 'Low limit reached';
-        const HIGH_LIMIT: felt252 = 'High limit reached';
+        const TVL_LIMIT: felt252 = 'Tvl limit reached';
+        const INVALID_TVL_LIMIT: felt252 = 'Tvl limit reached';
         const NOT_OWNER: felt252 = 'Not owner';
         const WITHDRAWAL_NOT_REDY: felt252 = 'Withdrawal not ready';
         const ALREADY_CLAIMED: felt252 = 'Already claimed';
@@ -77,10 +73,7 @@ mod TokenManager {
         l1_strategy: EthAddress,
         underlying: ContractAddress,
         performance_fees: u256,
-        min_deposit: u256,
-        max_deposit: u256,
-        min_withdrawal: u256,
-        max_withdrawal: u256,
+        tvl_limit: u256,
         withdrawal_epoch_delay: u256,
         dust_limit: u256
     ) {
@@ -89,8 +82,7 @@ mod TokenManager {
         self.l1_strategy.write(l1_strategy);
         self.underlying.write(underlying);
         self._set_performance_fees(performance_fees);
-        self._set_deposit_limit(min_deposit, max_deposit);
-        self._set_withdrawal_limit(min_withdrawal, max_withdrawal);
+        self._set_tvl_limit(tvl_limit);
         self._set_withdrawal_epoch_delay(withdrawal_epoch_delay);
         self._set_dust_limit(dust_limit);
     }
@@ -135,28 +127,10 @@ mod TokenManager {
             self.performance_fees.read()
         }
 
-        /// @notice Reads the low deposit limit
-        /// @return The current low limit for deposits
-        fn deposit_limit_low(self: @ContractState) -> u256 {
-            self.deposit_limit_low.read()
-        }
-
-        /// @notice Reads the high deposit limit
-        /// @return The current high limit for deposits
-        fn deposit_limit_high(self: @ContractState) -> u256 {
-            self.deposit_limit_high.read()
-        }
-
-        /// @notice Reads the low withdrawal limit
-        /// @return The current low limit for withdrawals
-        fn withdrawal_limit_low(self: @ContractState) -> u256 {
-            self.withdrawal_limit_low.read()
-        }
-
-        /// @notice Reads the high withdrawal limit
-        /// @return The current high limit for withdrawals
-        fn withdrawal_limit_high(self: @ContractState) -> u256 {
-            self.withdrawal_limit_high.read()
+        /// @notice Reads the tvl limit
+        /// @return The current max limit for tvl
+        fn tvl_limit(self: @ContractState) -> u256 {
+            self.tvl_limit.read()
         }
 
         /// @notice Reads the withdrawal epoch delay
@@ -281,39 +255,23 @@ mod TokenManager {
             self._assert_only_owner();
             self._set_performance_fees(new_performance_fees);
             let l1_strategy = self.l1_strategy.read();
+            let l2_strategy = get_contract_address();
             let pooling_manager = self.pooling_manager.read();
             let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
-            pooling_manager_disp.emit_performance_fees_updated_event(l1_strategy, new_performance_fees);
+            pooling_manager_disp.emit_performance_fees_updated_event(l1_strategy, l2_strategy, new_performance_fees);
         }
 
-        /// @notice Sets new deposit limits
+        /// @notice Sets new tvl limits
         /// @dev Only callable by the owner of the contract
-        /// @param new_deposit_limit_low The new lower limit for deposits
-        /// @param new_deposit_limit_high The new upper limit for deposits
-        fn set_deposit_limit(ref self: ContractState, new_deposit_limit_low: u256, new_deposit_limit_high: u256) {
+        /// @param new_tvl_limit The new limit for tvl
+        fn set_tvl_limit(ref self: ContractState, new_tvl_limit: u256) {
             self._assert_only_owner();
-            self._set_deposit_limit(new_deposit_limit_low, new_deposit_limit_high);
+            self._set_tvl_limit(new_tvl_limit);
             let l1_strategy = self.l1_strategy.read();
+            let l2_strategy = get_contract_address();
             let pooling_manager = self.pooling_manager.read();
             let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
-            pooling_manager_disp
-                .emit_deposit_limit_updated_event(l1_strategy, new_deposit_limit_low, new_deposit_limit_high);
-        }
-
-        /// @notice Sets new withdrawal limits
-        /// @dev Only callable by the owner of the contract
-        /// @param new_withdrawal_limit_low The new lower limit for withdrawals
-        /// @param new_withdrawal_limit_high The new upper limit for withdrawals
-        fn set_withdrawal_limit(
-            ref self: ContractState, new_withdrawal_limit_low: u256, new_withdrawal_limit_high: u256
-        ) {
-            self._assert_only_owner();
-            self._set_withdrawal_limit(new_withdrawal_limit_low, new_withdrawal_limit_high);
-            let l1_strategy = self.l1_strategy.read();
-            let pooling_manager = self.pooling_manager.read();
-            let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
-            pooling_manager_disp
-                .emit_withdrawal_limit_updated_event(l1_strategy, new_withdrawal_limit_low, new_withdrawal_limit_high);
+            pooling_manager_disp.emit_tvl_limit_updated_event(l1_strategy, l2_strategy, new_tvl_limit);
         }
 
         /// @notice Sets a new withdrawal epoch delay
@@ -323,9 +281,11 @@ mod TokenManager {
             self._assert_only_owner();
             self._set_withdrawal_epoch_delay(new_withdrawal_epoch_delay);
             let l1_strategy = self.l1_strategy.read();
+            let l2_strategy = get_contract_address();
             let pooling_manager = self.pooling_manager.read();
             let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
-            pooling_manager_disp.emit_withdrawal_epoch_delay_updated_event(l1_strategy, new_withdrawal_epoch_delay);
+            pooling_manager_disp
+                .emit_withdrawal_epoch_delay_updated_event(l1_strategy, l2_strategy, new_withdrawal_epoch_delay);
         }
 
         /// @notice Sets a new dust limit
@@ -347,11 +307,7 @@ mod TokenManager {
         /// @param receiver The address to receive the minted shares
         /// @param referal The referral address for the deposit
         fn deposit(ref self: ContractState, assets: u256, receiver: ContractAddress, referal: ContractAddress) {
-            let deposit_limit_low = self.deposit_limit_low.read();
-            let deposit_limit_high = self.deposit_limit_high.read();
-
-            assert(assets >= deposit_limit_low, Errors::LOW_LIMIT);
-            assert(assets <= deposit_limit_high, Errors::HIGH_LIMIT);
+            assert(assets + self._total_assets() <= self.tvl_limit.read(), Errors::TVL_LIMIT);
 
             let underlying = self.underlying.read();
             let erc20_disp = ERC20ABIDispatcher { contract_address: underlying };
@@ -372,18 +328,13 @@ mod TokenManager {
             let l1_strategy = self.l1_strategy.read();
             let pooling_manager = self.pooling_manager.read();
             let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
-            pooling_manager_disp.emit_deposit_event(l1_strategy, caller, receiver, assets, shares, referal);
+            pooling_manager_disp.emit_deposit_event(l1_strategy, this, caller, receiver, assets, shares, referal);
         }
 
         /// @notice Allows a user to request a withdrawal from the contract
         /// @dev Checks if the withdrawal amount is within the set limits before processing the withdrawal
         /// @param shares The amount of shares to withdraw
         fn request_withdrawal(ref self: ContractState, shares: u256) {
-            let withdrawal_limit_low = self.withdrawal_limit_low.read();
-            let withdrawal_limit_high = self.withdrawal_limit_high.read();
-            assert(shares >= withdrawal_limit_low, Errors::LOW_LIMIT);
-            assert(shares <= withdrawal_limit_high, Errors::HIGH_LIMIT);
-
             let token = self.token.read();
             let token_disp = ITokenDispatcher { contract_address: token };
             let caller = get_caller_address();
@@ -408,21 +359,23 @@ mod TokenManager {
             self.user_withdrawal_len.write(caller, user_withdrawal_len + 1);
 
             let l1_strategy = self.l1_strategy.read();
+            let l2_strategy = get_contract_address();
             let pooling_manager = self.pooling_manager.read();
             let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
             pooling_manager_disp
-                .emit_request_withdrawal_event(l1_strategy, caller, assets, shares, user_withdrawal_len, epoch);
+                .emit_request_withdrawal_event(
+                    l1_strategy, l2_strategy, caller, assets, shares, user_withdrawal_len, epoch
+                );
         }
 
 
         /// @notice Allows a user to claim a withdrawal
         /// @dev Validates that the withdrawal is ready to be claimed and processes it
         /// @param id The unique identifier of the withdrawal request
-        fn claim_withdrawal(ref self: ContractState, id: u256) {
-            let caller = get_caller_address();
-            let user_withdrawal_len = self.user_withdrawal_len(caller);
+        fn claim_withdrawal(ref self: ContractState, user: ContractAddress, id: u256) {
+            let user_withdrawal_len = self.user_withdrawal_len(user);
             assert(user_withdrawal_len > id, Errors::INVALID_ID);
-            let withdrawal_info = self.withdrawal_info.read((caller, id));
+            let withdrawal_info = self.withdrawal_info.read((user, id));
             assert(!withdrawal_info.claimed, Errors::ALREADY_CLAIMED);
             let handled_epoch_withdrawal_len = self.handled_epoch_withdrawal_len.read();
             assert(handled_epoch_withdrawal_len > withdrawal_info.epoch, Errors::WITHDRAWAL_NOT_REDY);
@@ -430,12 +383,13 @@ mod TokenManager {
             self
                 .withdrawal_info
                 .write(
-                    (caller, id),
+                    (user, id),
                     WithdrawalInfo { shares: withdrawal_info.shares, epoch: withdrawal_info.epoch, claimed: true }
                 );
 
             let withdrawal_pool = self.withdrawal_pool.read(withdrawal_info.epoch);
             let withdrawal_share = self.withdrawal_share.read(withdrawal_info.epoch);
+            
             let rate = self._withdrawal_exchange_rate_calc(withdrawal_pool, withdrawal_share);
             let assets = (rate * withdrawal_info.shares) / CONSTANTS::WAD;
 
@@ -444,12 +398,13 @@ mod TokenManager {
 
             let underlying = self.underlying.read();
             let underlying_disp = ERC20ABIDispatcher { contract_address: underlying };
-            underlying_disp.transfer(caller, assets);
+            underlying_disp.transfer(user, assets);
 
             let l1_strategy = self.l1_strategy.read();
+            let l2_strategy = get_contract_address();
             let pooling_manager = self.pooling_manager.read();
             let pooling_manager_disp = IPoolingManagerDispatcher { contract_address: pooling_manager };
-            pooling_manager_disp.emit_claim_withdrawal_event(l1_strategy, caller, id, assets);
+            pooling_manager_disp.emit_claim_withdrawal_event(l1_strategy, l2_strategy, user, id, assets);
         }
 
         /// @notice Handles the report from the L1 strategy
@@ -486,6 +441,7 @@ mod TokenManager {
                 l1_strategy: self.l1_strategy.read(),
                 action_id: action_id,
                 amount: amount,
+                processed: true,
                 new_share_price: new_share_price
             }
         }
@@ -590,26 +546,12 @@ mod TokenManager {
             self.performance_fees.write(new_performance_fees);
         }
 
-        /// @notice Sets the deposit limits for the contract
-        /// @param new_deposit_limit_low The new low limit for deposits
-        /// @param new_deposit_limit_high The new high limit for deposits
-        fn _set_deposit_limit(ref self: ContractState, new_deposit_limit_low: u256, new_deposit_limit_high: u256) {
-            assert(new_deposit_limit_low.is_non_zero(), Errors::ZERO_AMOUNT);
-            assert(new_deposit_limit_high > new_deposit_limit_low, Errors::INVALID_LIMIT);
-            self.deposit_limit_low.write(new_deposit_limit_low);
-            self.deposit_limit_high.write(new_deposit_limit_high);
-        }
-
-        /// @notice Sets the withdrawal limits for the contract
-        /// @param new_withdrawal_limit_low The new low limit for withdrawals
-        /// @param new_withdrawal_limit_high The new high limit for withdrawals
-        fn _set_withdrawal_limit(
-            ref self: ContractState, new_withdrawal_limit_low: u256, new_withdrawal_limit_high: u256
-        ) {
-            assert(new_withdrawal_limit_low > 0, Errors::ZERO_AMOUNT);
-            assert(new_withdrawal_limit_high > new_withdrawal_limit_low, Errors::INVALID_LIMIT);
-            self.withdrawal_limit_low.write(new_withdrawal_limit_low);
-            self.withdrawal_limit_high.write(new_withdrawal_limit_high);
+        /// @notice Sets the tvl limit max for the contract
+        /// @param new_tvl_limit The new limit for tvl
+        fn _set_tvl_limit(ref self: ContractState, new_tvl_limit: u256) {
+            assert(new_tvl_limit.is_non_zero(), Errors::ZERO_AMOUNT);
+            assert(self._total_assets() < new_tvl_limit, Errors::INVALID_TVL_LIMIT);
+            self.tvl_limit.write(new_tvl_limit);
         }
 
         /// @notice Sets the withdrawal epoch delay for the contract
@@ -683,20 +625,30 @@ mod TokenManager {
                 let mut new_handled_epoch_withdrawal_len = handled_epoch_withdrawal_len;
                 let mut j = handled_epoch_withdrawal_len;
                 let limit_epoch = epoch - withdrawal_epoch_delay;
+                let mut withdrawal_pool_mem = 0;
                 loop {
                     if (j > limit_epoch) {
                         break ();
                     }
 
-                    let withdrawal_pool = self.withdrawal_pool.read(j);
+                    withdrawal_pool_mem = self.withdrawal_pool.read(j);
 
-                    if (remaining_assets >= withdrawal_pool) {
-                        remaining_assets -= withdrawal_pool;
+                    if (remaining_assets >= withdrawal_pool_mem) {
+                        remaining_assets -= withdrawal_pool_mem;
                         new_handled_epoch_withdrawal_len += 1;
                     } else {
-                        needed_assets += withdrawal_pool - remaining_assets;
+                        let mut cumulative_withdrawal_pool = withdrawal_pool_mem;
+                        let mut k = j + 1;
+                        loop {
+                            if (k > limit_epoch) {
+                                break ();
+                            }
+                            cumulative_withdrawal_pool += self.withdrawal_pool.read(k);
+                            k += 1;
+                        };
+                        needed_assets = cumulative_withdrawal_pool - remaining_assets;
+                        break();
                     }
-
                     j += 1;
                 };
                 if (new_handled_epoch_withdrawal_len > handled_epoch_withdrawal_len) {

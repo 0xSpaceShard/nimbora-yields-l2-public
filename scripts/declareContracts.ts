@@ -53,13 +53,11 @@ async function main() {
         case "TokenManager":
             console.log("Declaring TokenManager...");
             await declareContract('TokenManager');
-
             break;
 
         case "Token":
             console.log("Declaring Token...");
             await declareContract('Token');
-
             break;
 
         default:
