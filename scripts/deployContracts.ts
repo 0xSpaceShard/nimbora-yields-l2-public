@@ -1,63 +1,54 @@
-import { Account, Contract, json, RpcProvider, constants } from "starknet";
+import { Account, Contract, json, RpcProvider } from "starknet";
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { readConfigs, writeConfigs } from "./utils";
 
 dotenv.config({ path: __dirname + '/../.env' })
 
-const network = process.env.STARKNET_NETWORK || ''
-
-const provider = new RpcProvider({ nodeUrl: network == "mainnet" ? constants.NetworkName.SN_MAIN : constants.NetworkName.SN_GOERLI });
+const provider = new RpcProvider({ nodeUrl: `https://starknet-${process.env.STARKNET_NETWORK}.infura.io/v3/${process.env.INFURA_API_KEY}`});
 const owner = new Account(provider, process.env.ACCOUNT_ADDRESS as string, process.env.ACCOUNT_PK as string, "1");
-const { POOLING_MANAGER_CLASS_HASH, FACTORY_CLASS_HASH, TOKEN_CLASS_HASH, TOKEN_MANAGER_CLASS_HASH } = readConfigs()[network]
 
 async function deployPoolingManagerContract(): Promise<Contract> {
-
-    let contractAddress: any;
-    const compiledContract = await json.parse(fs.readFileSync(`./target/dev/nimbora_yields_PoolingManager.contract_class.json`).toString('ascii'));
-    let { transaction_hash, contract_address } = await owner.deploy({
-        classHash: POOLING_MANAGER_CLASS_HASH as string,
+    
+    const compiledContract = await json.parse(fs.readFileSync(`./target/dev/nimbora_yields_poolingManager.contract_class.json`).toString('ascii'));
+    const { transaction_hash, contract_address } = await owner.deploy({
+        classHash: process.env.POOLINGMANAGER_CLASS_HASH as string,
         constructorCalldata: {
             owner: owner.address,
         },
+        salt: "3"
     });
-    [contractAddress] = contract_address;
+
+    const contractAddress: any = contract_address[0];
     await provider.waitForTransaction(transaction_hash);
+
     const poolingManagerContract = new Contract(compiledContract.abi, contractAddress, owner);
     console.log('✅ Test PoolingManager contract connected at =', poolingManagerContract.address);
 
-    let configs = readConfigs()
-    if (!configs[network]) {
-        configs[network] = {}
-    }
-    configs[network].l2PoolingManager = poolingManagerContract.address
-    writeConfigs(configs)
+    fs.appendFile(__dirname + '/../.env', `\n${'POOLINGMANAGER'.toUpperCase()}_ADDRESS=${contractAddress}`, function (err) {
+        if (err) throw err;
+    });
     return poolingManagerContract;
 }
 
 async function deployFactoryContract(): Promise<Contract> {
-    let contractAddress: any;
     const compiledContract = await json.parse(fs.readFileSync(`./target/dev/nimbora_yields_Factory.contract_class.json`).toString('ascii'));
-    let configs = readConfigs();
-    const l2PoolingManager = configs[network].l2PoolingManager;
 
-    let { transaction_hash, contract_address } = await owner.deploy({
-        classHash: FACTORY_CLASS_HASH as string,
+    const { transaction_hash, contract_address } = await owner.deploy({
+        classHash: process.env.FACTORY_CLASS_HASH as string,
         constructorCalldata: {
-            pooling_manager: l2PoolingManager as string,
-            token_class_hash: TOKEN_CLASS_HASH as string,
-            token_manager_class_hash: TOKEN_MANAGER_CLASS_HASH as string,
+            pooling_manager: process.env.POOLINGMANAGER_ADDRESS as string,
+            token_class_hash: process.env.TOKEN_CLASS_HASH as string,
+            token_manager_class_hash: process.env.TOKENMANAGER_CLASS_HASH as string,
         },
     });
-    [contractAddress] = contract_address;
+    const [contractAddress] = contract_address;
     await provider.waitForTransaction(transaction_hash);
 
     const factoryContract = new Contract(compiledContract.abi, contractAddress, owner);
     console.log('✅ Test Factory contract connected at =', factoryContract.address);
-
-    configs[network].factory = factoryContract.address
-    writeConfigs(configs)
-
+    fs.appendFile(__dirname + '/../.env', `\n${'FACTORY'.toUpperCase()}_ADDRESS=${contractAddress}`, function (err) {
+        if (err) throw err;
+    });
     return factoryContract;
 }
 
@@ -77,15 +68,12 @@ async function main() {
         switch (action) {
             case "PoolingManager":
                 console.log("Deploying PoolingManager...");
-
-                const poolingManagerContract = await deployPoolingManagerContract(
-                );
+                await deployPoolingManagerContract();
                 break;
 
             case "Factory":
                 console.log("Deploying Factory...");
-                const factoryContractAddress = await deployFactoryContract();
-
+                await deployFactoryContract();
                 break;
         }
     } else if (flag == "--setup") {
